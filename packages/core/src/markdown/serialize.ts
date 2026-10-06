@@ -69,18 +69,62 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
       .join(source.eol);
 
   /** Writes one new or changed node from scratch; null for nodes that only exist inside a table. */
-  const rewrite = (n: Node, prefix: string, parent: Node | null, index: number): string | null => {
+  const rewrite = (
+    n: Node,
+    prefix: string,
+    parent: Node | null,
+    index: number,
+    was: Node | null = null,
+  ): string | null => {
     if (n.type.name === "table_row" || n.type.name === "table_cell") return null;
     if (n.type.name === "doc") {
       const blocks = indent(writeBlocks(childNodes(n), source.style), prefix);
       return source.doc.childCount === 0 ? blocks + text : blocks;
     }
     if (n.type.name === "list_item" && parent) {
-      const ordered = parent.attrs["ordered"] as boolean;
-      const start = ordered ? ((parent.attrs["start"] as number | null) ?? 1) + index : null;
-      return indent(writeBlocks([schema.nodes.list.create({ ...parent.attrs, start }, n)], source.style), prefix);
+      const written = writeBlocks([schema.nodes.list.create({ ...parent.attrs, start: 1 }, n)], source.style);
+      const m = /^([-*+]|\d+[.)])(?: |$)([^]*)$/.exec(written);
+      const head = itemHead(parent, index, was);
+      if (!m || m[2] === "") return head.trimEnd();
+      const width = m[1]!.length + 1;
+      const pad = " ".repeat(head.length);
+      const lines = m[2]!
+        .split("\n")
+        .map((line, i) => (i === 0 ? head : line === "" ? "" : pad) + line.slice(i === 0 ? 0 : width));
+      return indent(lines.join("\n"), prefix);
     }
     return indent(writeBlocks([n], source.style), prefix);
+  };
+
+  /**
+   * Marker and spacing for item `index` of `list`, copied from its nearest unedited item, or from
+   * `was`, the list as loaded. A list numbered all alike repeats its number; any other counts on
+   * from the item before.
+   */
+  const itemHead = (list: Node, index: number, was: Node | null): string => {
+    const headOf = (item: Node) => {
+      const r = source.ranges.get(item);
+      return r ? /^(?:([-*+])|(\d+)([.)]))([ \t]*)/.exec(text.slice(r.start, r.end)) : null;
+    };
+    const heads = childNodes(list).map(headOf);
+    const loaded = was ? childNodes(was).map(headOf) : [];
+    let found: RegExpExecArray | null = null;
+    for (let k = index - 1; k >= 0 && !found; k--) found = heads[k] ?? null;
+    for (let k = index + 1; k < heads.length && !found; k++) found = heads[k] ?? null;
+    found ??= loaded[Math.min(Math.max(index - 1, 0), loaded.length - 1)] ?? null;
+    const spacing = found && /^ {1,4}$/.test(found[4]!) ? found[4]! : " ";
+    if (!(list.attrs["ordered"] as boolean)) return (found?.[1] ?? source.style.bullet) + spacing;
+    const numbers = loaded.flatMap((h) => (h?.[2] === undefined ? [] : [Number(h[2])]));
+    const repeated = numbers.length > 1 && numbers.every((x) => x === numbers[0]);
+    const start = (list.attrs["start"] as number | null) ?? 1;
+    const numberAt = (k: number): number => {
+      if (k === 0) return start;
+      if (repeated) return numbers[0]!;
+      const kept = heads[k]?.[2];
+      return kept === undefined ? numberAt(k - 1) + 1 : Number(kept);
+    };
+    const width = found?.[2]?.startsWith("0") ? found[2].length : 0;
+    return String(numberAt(index)).padStart(width, "0") + (found?.[3] ?? ".") + spacing;
   };
 
   /** The prefix of continuation lines inside `container`, given the prefix of the container's own lines. */
@@ -155,7 +199,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     if (removed === added) {
       let out = gaps[0]!;
       for (let k = 0; k < n; k++) {
-        const written = emit(before[k]!, after[k]!, prefix) ?? rewrite(after[k]!, prefix, edited, k);
+        const written = emit(before[k]!, after[k]!, prefix) ?? rewrite(after[k]!, prefix, edited, k, original);
         if (written === null) return null;
         out += written + gaps[k + 1]!;
       }
@@ -163,8 +207,15 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     }
 
     const isList = original.type.name === "list";
+    /** For a list, the gap at the edit, so that a new item lines up with the items beside it. */
+    const local = i > 0 && i < n ? gaps[i]! : i === n && n > 1 ? gaps[n - 1]! : "";
+    const near = spans[Math.max(0, Math.min(i, n) - 1)]!.start;
+    const lineHead = text.slice(text.lastIndexOf("\n", near - 1) + 1, near);
     const separator = isList
-      ? (gaps.slice(1, n).find((g) => g.includes("\n")) ?? source.eol + prefix)
+      ? local.includes("\n")
+        ? local
+        : (gaps.slice(1, n).find((g) => g.includes("\n")) ??
+          source.eol + (/^[ \t>]*$/.test(lineHead) ? lineHead : prefix))
       : (gaps.slice(1, n).find((g) => blankLine.test(g)) ?? source.eol + prefix.trimEnd() + source.eol + prefix);
     /** A gap that keeps the blocks on each side apart. */
     const apart = (gap: string) => (isList || blankLine.test(gap) ? gap : separator);
@@ -182,7 +233,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
 
     const fresh: string[] = [];
     for (let k = i; k < i + added; k++) {
-      const written = rewrite(after[k]!, prefix, edited, k);
+      const written = rewrite(after[k]!, prefix, edited, k, original);
       if (written === null) return null;
       fresh.push(written);
     }

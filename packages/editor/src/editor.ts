@@ -3,6 +3,7 @@ import { baseKeymap } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { EditorView } from "prosemirror-view";
+import { listKeys } from "./lists.ts";
 import { clipboardParser, domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
 
@@ -29,7 +30,7 @@ export function createEditor(
 ): Editor {
   const undoable =
     options.history === false ? [] : [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo })];
-  const plugins = [...undoable, keymap(baseKeymap)];
+  const plugins = [...undoable, keymap(listKeys), keymap(baseKeymap)];
   const session = new Session(post, plugins);
   const view = new EditorView(place, {
     state: session.state,

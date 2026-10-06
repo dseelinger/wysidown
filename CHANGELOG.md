@@ -5,6 +5,14 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Lists can be edited from the keyboard. Enter adds an item, and Enter on an empty item moves it
+  out of a nested list or ends the list; Tab nests an item under the one above and Shift+Tab
+  moves it back out. A new item is written the way its list already is: the same bullet (`-`,
+  `*` or `+`), the same `.` or `)` after a number, numbers that count on (or stay all `1.` in a
+  list numbered that way), and the same spacing after the marker. Task items show a checkbox;
+  clicking it, or pressing Space on it, changes only the space or `x` between the brackets, and
+  Enter after a task adds an unchecked one. Tight lists show their items close together, as
+  GitHub does.
 - In VS Code, a `.md` file can be opened in Wysidown with **Reopen Editor With… › Wysidown**; the
   ordinary text editor stays the default. Edits made in Wysidown change only the characters you
   typed. Undo, redo and save are VS Code's own, the file keeps its line endings and byte order

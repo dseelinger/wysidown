@@ -27,7 +27,7 @@ export interface Case {
   source: MarkdownSource;
 }
 
-export type EditKind = "word" | "markdown characters" | "bold" | "insert" | "delete" | "toggle";
+export type EditKind = "word" | "markdown characters" | "bold" | "insert" | "delete" | "toggle" | "new item";
 
 /** Applies every edit of one kind to `input`, one at a time, and classifies each. */
 export function editCases(input: string, kind: EditKind): Case[] {
@@ -113,6 +113,20 @@ export function editCases(input: string, kind: EditKind): Case[] {
           new Transform(source.doc).delete(pos, pos + block.nodeSize),
           (output) => output.startsWith(before) && output.endsWith(after),
         );
+      });
+      break;
+    case "new item":
+      source.doc.descendants((node, pos) => {
+        if (node.type.name !== "list_item") return true;
+        const checked = node.attrs["checked"] === null ? null : false;
+        const paragraph = schema.nodes.paragraph.create(null, schema.text("New item"));
+        const item = schema.nodes.list_item.create({ checked }, paragraph);
+        const end = source.ranges.get(node)!.end + offset;
+        record(
+          new Transform(source.doc).insert(pos + node.nodeSize, item),
+          (output) => output.slice(0, end) === input.slice(0, end) && output.endsWith(input.slice(end)),
+        );
+        return true;
       });
       break;
     case "toggle":

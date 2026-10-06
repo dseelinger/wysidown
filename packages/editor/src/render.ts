@@ -8,6 +8,7 @@ import {
   type ParseOptions,
 } from "prosemirror-model";
 import type { MarkViewConstructor, NodeViewConstructor } from "prosemirror-view";
+import { listItemView } from "./lists.ts";
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
 
@@ -30,8 +31,13 @@ const nodes: Record<string, (node: Node) => DOMOutputSpec> = {
   paragraph: () => ["p", 0],
   heading: (n) => [`h${String(n.attrs["level"])}`, 0],
   blockquote: () => ["blockquote", 0],
-  list: (n) =>
-    n.attrs["ordered"] ? ["ol", { start: String((n.attrs["start"] as number | null) ?? 1) }, 0] : ["ul", 0],
+  list: (n) => {
+    let loose = n.attrs["spread"] as boolean;
+    n.forEach((item) => (loose ||= item.attrs["spread"] as boolean));
+    const tight = loose ? {} : { class: "tight" };
+    const start = String((n.attrs["start"] as number | null) ?? 1);
+    return n.attrs["ordered"] ? ["ol", { ...tight, start }, 0] : ["ul", tight, 0];
+  },
   list_item: (n) => {
     const checked = n.attrs["checked"] as boolean | null;
     return checked === null ? ["li", 0] : ["li", { class: "task", "data-checked": String(checked) }, 0];
@@ -86,6 +92,7 @@ export function views(document: Document): {
   for (const [name, spec] of Object.entries(nodes)) {
     nodeViews[name] = (node) => DOMSerializer.renderSpec(document, spec(node));
   }
+  nodeViews["list_item"] = listItemView(document);
   const markViews: Record<string, MarkViewConstructor> = {};
   for (const [name, spec] of Object.entries(marks)) {
     markViews[name] = (mark) => DOMSerializer.renderSpec(document, spec(mark));
