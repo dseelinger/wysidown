@@ -5,6 +5,9 @@ export class MemoryHost {
   readonly #send: (message: HostMessage) => void;
   #text: string;
   #version = 1;
+  /** The pending `flush` calls, oldest first. */
+  #flushes: { id: number; resolve: (text: string) => void }[] = [];
+  #lastFlush = 0;
 
   constructor(send: (message: HostMessage) => void, text = "") {
     this.#send = send;
@@ -32,7 +35,20 @@ export class MemoryHost {
         this.#text = applyEdits(this.#text, message.edits);
         this.#version++;
         this.#send({ type: "accepted", version: this.#version });
+        return;
+      case "flushed":
+        for (const f of this.#flushes.filter((f) => f.id <= message.id)) f.resolve(this.#text);
+        this.#flushes = this.#flushes.filter((f) => f.id > message.id);
     }
+  }
+
+  /** Asks the editor to send its changes; resolves with the text at the moment it says it has. */
+  flush(): Promise<string> {
+    const id = ++this.#lastFlush;
+    return new Promise((resolve) => {
+      this.#flushes.push({ id, resolve });
+      this.#send({ type: "flush", id });
+    });
   }
 
   /** Shows a different document, as opening another file does. */

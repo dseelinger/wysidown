@@ -176,16 +176,8 @@ export async function caret(o: Opened, text: string, ...keys: string[]): Promise
   }
 }
 
-/** Presses Ctrl+S until the saved file holds `expected`, so that edits still on their way are included. */
-export async function saveUntil(o: Opened, expected: string): Promise<void> {
-  const end = Date.now() + 10000;
-  for (;;) {
-    await o.window.keyboard.press("Control+S");
-    await o.window.waitForTimeout(250);
-    const saved = readText(o.path);
-    if (saved === expected || Date.now() > end) {
-      expect(saved).toBe(expected);
-      return;
-    }
-  }
+/** Presses Ctrl+S once and waits for the file to hold `expected`. */
+export async function save(o: Opened, expected: string): Promise<void> {
+  await o.window.keyboard.press("Control+S");
+  await expect.poll(() => readText(o.path), { timeout: 10000 }).toBe(expected);
 }

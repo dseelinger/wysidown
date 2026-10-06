@@ -13,6 +13,9 @@ export class EditorConnection implements vscode.Disposable {
   #version = 0;
   #applying = false;
   #queue = Promise.resolve();
+  /** The pending `flush` calls, oldest first. */
+  #flushes: { id: number; resolve: () => void }[] = [];
+  #lastFlush = 0;
 
   constructor(document: vscode.TextDocument, send: (message: HostMessage) => void) {
     this.#document = document;
@@ -29,13 +32,40 @@ export class EditorConnection implements vscode.Disposable {
     return this.#queue;
   }
 
+  /**
+   * Asks the editor to send its changes and resolves once they are applied to the document, or
+   * after `ms` milliseconds when the editor does not answer. VS Code gives a save's listeners
+   * 1500 milliseconds in all and ignores one that runs over too often, so `ms` stays below that.
+   */
+  flush(ms = 1000): Promise<void> {
+    const id = ++this.#lastFlush;
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      this.#flushes.push({
+        id,
+        resolve: () => {
+          clearTimeout(timer);
+          resolve();
+        },
+      });
+      this.#send({ type: "flush", id });
+    });
+  }
+
   dispose(): void {
     this.#listener.dispose();
+    for (const f of this.#flushes.splice(0)) f.resolve();
   }
 
   async #handle(message: unknown): Promise<void> {
     if (isReady(message)) {
       this.#tell("load");
+      return;
+    }
+    if (isFlushed(message)) {
+      const answered = this.#flushes.filter((f) => f.id <= message.id);
+      this.#flushes = this.#flushes.filter((f) => f.id > message.id);
+      for (const f of answered) f.resolve();
       return;
     }
     if (!isEdit(message)) return;
@@ -78,6 +108,12 @@ export class EditorConnection implements vscode.Disposable {
 
 function isReady(message: unknown): message is Extract<EditorMessage, { type: "ready" }> {
   return typeof message === "object" && message !== null && (message as { type?: unknown }).type === "ready";
+}
+
+function isFlushed(message: unknown): message is Extract<EditorMessage, { type: "flushed" }> {
+  if (typeof message !== "object" || message === null) return false;
+  const m = message as { type?: unknown; id?: unknown };
+  return m.type === "flushed" && Number.isInteger(m.id);
 }
 
 function isEdit(message: unknown): message is Extract<EditorMessage, { type: "edit" }> {

@@ -29,6 +29,8 @@ export class Session {
   /** The text the in-flight edit produces; null when no edit is in flight. */
   #sent: string | null = null;
   #written: { doc: Node; text: string } | null = null;
+  /** The id of the latest `flush` not yet answered; null when none is waiting. */
+  #flushAsked: number | null = null;
 
   constructor(post: (message: EditorMessage) => void, plugins: readonly Plugin[] = []) {
     this.#post = post;
@@ -74,6 +76,10 @@ export class Session {
         this.#sent = null;
         this.#flush();
         return null;
+      case "flush":
+        this.#flushAsked = message.id;
+        this.#flush();
+        return null;
     }
   }
 
@@ -88,17 +94,28 @@ export class Session {
     this.#version = version;
     this.#sent = null;
     this.#written = null;
+    this.#answerFlush();
   }
 
+  /** Sends the document's changes as an edit unless one is in flight; answers a pending `flush` once none is. */
   #flush(): void {
-    if (!this.#source || this.#sent !== null) return;
-    const doc = this.#state.doc;
-    if (this.#written?.doc !== doc)
-      this.#written = { doc, text: serializeMarkdown(this.#source, written(doc, this.#source)).text };
-    const edit = diffText(this.#hostText, this.#written.text);
-    if (!edit) return;
-    this.#sent = this.#written.text;
-    this.#post({ type: "edit", baseVersion: this.#version, edits: [edit] });
+    if (this.#source && this.#sent === null) {
+      const doc = this.#state.doc;
+      if (this.#written?.doc !== doc)
+        this.#written = { doc, text: serializeMarkdown(this.#source, written(doc, this.#source)).text };
+      const edit = diffText(this.#hostText, this.#written.text);
+      if (edit) {
+        this.#sent = this.#written.text;
+        this.#post({ type: "edit", baseVersion: this.#version, edits: [edit] });
+      }
+    }
+    this.#answerFlush();
+  }
+
+  #answerFlush(): void {
+    if (this.#flushAsked === null || this.#sent !== null) return;
+    this.#post({ type: "flushed", id: this.#flushAsked });
+    this.#flushAsked = null;
   }
 }
 

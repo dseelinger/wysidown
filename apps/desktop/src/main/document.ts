@@ -8,6 +8,9 @@ export class HostDocument {
   #text = "";
   #saved = "";
   #version = 1;
+  /** The pending `flush` calls, oldest first. */
+  #flushes: { id: number; resolve: () => void }[] = [];
+  #lastFlush = 0;
 
   constructor(send: (message: HostMessage) => void, onDirtyChange: () => void) {
     this.#send = send;
@@ -34,6 +37,12 @@ export class HostDocument {
       this.#send({ type: "load", text: this.#text, version: this.#version });
       return;
     }
+    if (isFlushed(message)) {
+      const answered = this.#flushes.filter((f) => f.id <= message.id);
+      this.#flushes = this.#flushes.filter((f) => f.id > message.id);
+      for (const f of answered) f.resolve();
+      return;
+    }
     if (!isEdit(message)) return;
     if (message.baseVersion !== this.#version) {
       this.#send({ type: "changed", text: this.#text, version: this.#version });
@@ -51,6 +60,25 @@ export class HostDocument {
     this.#version++;
     this.#send({ type: "accepted", version: this.#version });
     if (this.dirty !== wasDirty) this.#onDirtyChange();
+  }
+
+  /**
+   * Asks the editor to send its changes and resolves once they are applied, or after `ms`
+   * milliseconds when the editor does not answer. Call before reading `text` or `dirty` for a save.
+   */
+  flush(ms = 2000): Promise<void> {
+    const id = ++this.#lastFlush;
+    return new Promise((resolve) => {
+      const timer = setTimeout(resolve, ms);
+      this.#flushes.push({
+        id,
+        resolve: () => {
+          clearTimeout(timer);
+          resolve();
+        },
+      });
+      this.#send({ type: "flush", id });
+    });
   }
 
   /** Shows `text`, read from `path`, as the document; it starts with no unsaved changes. */
@@ -73,6 +101,12 @@ export class HostDocument {
 
 function isReady(message: unknown): message is Extract<EditorMessage, { type: "ready" }> {
   return typeof message === "object" && message !== null && (message as { type?: unknown }).type === "ready";
+}
+
+function isFlushed(message: unknown): message is Extract<EditorMessage, { type: "flushed" }> {
+  if (typeof message !== "object" || message === null) return false;
+  const m = message as { type?: unknown; id?: unknown };
+  return m.type === "flushed" && Number.isInteger(m.id);
 }
 
 function isEdit(message: unknown): message is Extract<EditorMessage, { type: "edit" }> {

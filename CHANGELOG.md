@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Saving straight after typing saves everything typed. In VS Code, Ctrl+S pressed a moment after
+  the last keystroke could save the file without the last few characters and leave it marked as
+  changed; the Windows app could do the same, and could close without asking about changes typed
+  just before closing.
 - Lists can be edited from the keyboard. Enter adds an item, and Enter on an empty item moves it
   out of a nested list or ends the list; Tab nests an item under the one above and Shift+Tab
   moves it back out. A new item is written the way its list already is: the same bullet (`-`,

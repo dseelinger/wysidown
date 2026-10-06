@@ -24,8 +24,13 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       if (message.type === "load") this.#loaded.fire(document);
     });
     const subscription = webview.onDidReceiveMessage((message: unknown) => connection.receive(message));
+    // A save waits for typing the editor has not yet sent; a hidden webview has none.
+    const saving = vscode.workspace.onWillSaveTextDocument((event) => {
+      if (event.document === document && panel.visible) event.waitUntil(connection.flush());
+    });
     panel.onDidDispose(() => {
       subscription.dispose();
+      saving.dispose();
       connection.dispose();
     });
   }

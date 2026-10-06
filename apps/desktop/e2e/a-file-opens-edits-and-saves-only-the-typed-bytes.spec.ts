@@ -14,7 +14,7 @@ import {
   newPath,
   readText,
   quit,
-  saveUntil,
+  save,
   title,
 } from "./support.ts";
 
@@ -33,8 +33,23 @@ test("a file named on the command line opens, and saving after typing writes onl
     await clickAtEnd(window, sentence);
     await window.keyboard.type(" Really.");
     await expect.poll(() => title(app)).toBe(`● ${name} — Wysidown`);
-    await saveUntil(app, path, typed(blog));
+    await save(app, path, typed(blog));
     await expect.poll(() => title(app)).toBe(`${name} — Wysidown`);
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("saving straight after typing writes every typed character", async () => {
+  const lists = "04-lists-nested.md";
+  const path = copyFixture(lists);
+  const { app, window, errors } = await launch(path);
+  try {
+    await clickAtEnd(window, "Pears");
+    await window.keyboard.type(" and figs");
+    await save(app, path, fixture(lists).replace("  - Pears\n", "  - Pears and figs\n"));
+    await expect.poll(() => title(app)).toBe(`${lists} — Wysidown`);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
@@ -48,7 +63,7 @@ test("a file with CRLF line endings and a byte order mark keeps both when saved"
   try {
     await clickAtEnd(window, sentence);
     await window.keyboard.type(" Really.");
-    await saveUntil(app, path, typed(original));
+    await save(app, path, typed(original));
     expect(readFileSync(path).subarray(0, 3)).toEqual(Buffer.from([0xef, 0xbb, 0xbf]));
     expect(errors).toEqual([]);
   } finally {
@@ -99,7 +114,7 @@ test("Save on an untitled document asks where to save it", async () => {
     await window.keyboard.type("Hello");
     await expect.poll(() => title(app)).toBe("● Untitled — Wysidown");
     await chooseToSaveAs(app, path);
-    await saveUntil(app, path, "Hello");
+    await save(app, path, "Hello");
     await expect.poll(() => title(app)).toBe("new.md — Wysidown");
     expect(errors).toEqual([]);
   } finally {

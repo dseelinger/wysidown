@@ -13,7 +13,12 @@ export type HostMessage =
   /** The text changed outside the editor (another editor, undo in the host, a file change on disk). */
   | { type: "changed"; text: string; version: number }
   /** The host applied the editor's edits; `version` is the version after them. */
-  | { type: "accepted"; version: number };
+  | { type: "accepted"; version: number }
+  /**
+   * The host is about to read its text (to save it, or to ask whether to save it) and waits for
+   * `flushed`. `id` increases with each `flush`.
+   */
+  | { type: "flush"; id: number };
 
 /** Sent by the editor. */
 export type EditorMessage =
@@ -23,4 +28,10 @@ export type EditorMessage =
    * The user edited the document. `edits` refer to the text at `baseVersion`. A host whose
    * version has moved on discards them and replies with `changed`.
    */
-  | { type: "edit"; baseVersion: number; edits: readonly TextEdit[] };
+  | { type: "edit"; baseVersion: number; edits: readonly TextEdit[] }
+  /**
+   * Answers `flush`: every change the user made before it has been sent as an edit and accepted,
+   * or replaced by the host's text. Messages before it are handled first. `id` is that of the
+   * latest `flush` answered; earlier ones are answered with it.
+   */
+  | { type: "flushed"; id: number };

@@ -46,6 +46,7 @@ async function open(path: string): Promise<void> {
 /** Writes the document to `path`. Returns false when the write failed. */
 async function saveTo(path: string): Promise<boolean> {
   if (!doc) return false;
+  await doc.flush();
   const text = doc.text;
   try {
     await writeFile(path, text, "utf8");
@@ -74,6 +75,7 @@ async function save(): Promise<boolean> {
 
 /** Asks whether to save unsaved changes. Resolves true when the document may be replaced or closed. */
 async function confirmDiscard(): Promise<boolean> {
+  await doc?.flush();
   if (!win || !doc?.dirty) return true;
   const name = doc.path === null ? "Untitled" : basename(doc.path);
   const { response } = await dialog.showMessageBox(win, {
@@ -157,7 +159,7 @@ function createWindow(): void {
     event.preventDefault();
   });
   win.on("close", (event) => {
-    if (closing || !doc?.dirty) return;
+    if (closing || !doc) return;
     event.preventDefault();
     void confirmDiscard().then((ok) => {
       if (ok) {

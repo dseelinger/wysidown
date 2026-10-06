@@ -101,14 +101,10 @@ export async function clickAtEnd(window: Page, text: string): Promise<void> {
   await window.keyboard.press("End");
 }
 
-/** Saves until the file at `path` holds `expected`; edits reach the main process a moment after the keys. */
-export async function saveUntil(app: ElectronApplication, path: string, expected: string): Promise<void> {
-  await expect
-    .poll(async () => {
-      await menu(app, "save");
-      return existsSync(path) ? readFileSync(path, "utf8") : null;
-    })
-    .toBe(expected);
+/** Clicks File > Save once and waits for the file at `path` to hold `expected`. */
+export async function save(app: ElectronApplication, path: string, expected: string): Promise<void> {
+  await menu(app, "save");
+  await expect.poll(() => (existsSync(path) ? readFileSync(path, "utf8") : null)).toBe(expected);
 }
 
 function fixturePath(name: string): string {
