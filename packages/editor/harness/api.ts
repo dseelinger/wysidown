@@ -1,4 +1,4 @@
-import type { EditorMessage, HostMessage } from "@wysidown/core";
+import type { EditorMessage, HostMessage, Resources } from "@wysidown/core";
 
 /** What the harness page exposes to Playwright as `window.harness`. */
 export interface Harness {
@@ -9,6 +9,8 @@ export interface Harness {
   load(text: string): void;
   /** Changes the text outside the editor. */
   change(text: string): void;
+  /** Tells the editor where images and links lead. */
+  resources(resources: Resources): void;
   /** Milliseconds each message takes to arrive, in either direction. */
   latency: number;
   /** Every message sent so far, in order. */

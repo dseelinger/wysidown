@@ -52,6 +52,9 @@ const harness: Harness = {
   change: (text) => {
     host.change(text);
   },
+  resources: (resources) => {
+    toEditor({ type: "resources", ...resources });
+  },
   selectionInSync: () => {
     const { view } = editor;
     const dom = view.dom.ownerDocument.getSelection();

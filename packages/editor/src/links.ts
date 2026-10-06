@@ -1,4 +1,11 @@
-import { definitionTarget, retargetDefinition, schema, type LinkTarget } from "@wysidown/core";
+import {
+  definitionTarget,
+  headingAnchors,
+  markdownLinkPath,
+  retargetDefinition,
+  schema,
+  type LinkTarget,
+} from "@wysidown/core";
 import type { Mark, Node, ResolvedPos } from "prosemirror-model";
 import { keydownHandler } from "prosemirror-keymap";
 import { Plugin, TextSelection, type Command, type EditorState, type Transaction } from "prosemirror-state";
@@ -124,6 +131,37 @@ export function setLink(at: LinkAt | null, text: string, href: string): Command 
   };
 }
 
+/** True when the editor can follow a link to `href`: a heading in this document, or another markdown file. */
+export function followable(href: string): boolean {
+  return href.startsWith("#") || markdownLinkPath(href) !== null;
+}
+
+/**
+ * Follows a link to `href`. A `#` target puts the cursor in the heading with that anchor and
+ * scrolls it to the top; a link to another markdown file is passed to `open`. Returns false when
+ * the link leads nowhere the editor can go.
+ */
+export function follow(view: EditorView, href: string, open: (href: string) => void): boolean {
+  if (!href.startsWith("#")) {
+    if (markdownLinkPath(href) === null) return false;
+    open(href);
+    return true;
+  }
+  let anchor = href.slice(1);
+  try {
+    anchor = decodeURIComponent(anchor);
+  } catch {
+    // An anchor that is not valid percent-encoding is matched as written.
+  }
+  const anchors = headingAnchors(view.state.doc);
+  const pos = anchors.get(anchor) ?? anchors.get(anchor.toLowerCase());
+  if (pos === undefined) return false;
+  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, pos + 1)));
+  view.focus();
+  (view.nodeDOM(pos) as HTMLElement | null)?.scrollIntoView({ block: "start" });
+  return true;
+}
+
 /** Takes the link `at` off its text. */
 export function unlink(at: LinkAt): Command {
   return (state, dispatch) => {
@@ -138,6 +176,8 @@ class LinkPopover {
   readonly #dom: HTMLElement;
   readonly #target: HTMLElement;
   readonly #actions: HTMLElement;
+  readonly #open: HTMLButtonElement;
+  readonly #editButtons: HTMLButtonElement[];
   readonly #form: HTMLFormElement;
   readonly #text: HTMLInputElement;
   readonly #href: HTMLInputElement;
@@ -148,7 +188,7 @@ class LinkPopover {
     this.#position();
   };
 
-  constructor(view: EditorView) {
+  constructor(view: EditorView, open: (href: string) => void) {
     this.#view = view;
     const document = view.dom.ownerDocument;
     const element = <K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K, className = "") => {
@@ -174,13 +214,20 @@ class LinkPopover {
       b.addEventListener("click", action);
       return b;
     };
-    button("Edit", () => {
-      this.edit();
+    this.#open = button("Open", () => {
+      const target = this.#at ? targetOf(this.#view.state.doc, this.#at.mark) : null;
+      if (target !== null) follow(this.#view, target, open);
     });
-    button("Remove", () => {
-      if (this.#at) unlink(this.#at)(this.#view.state, this.#view.dispatch);
-      this.#view.focus();
-    });
+    this.#open.title = "Open (Ctrl+click)";
+    this.#editButtons = [
+      button("Edit", () => {
+        this.edit();
+      }),
+      button("Remove", () => {
+        if (this.#at) unlink(this.#at)(this.#view.state, this.#view.dispatch);
+        this.#view.focus();
+      }),
+    ];
 
     this.#form = element(this.#dom, "form", "link-form");
     const field = (label: string, name: string) => {
@@ -234,7 +281,8 @@ class LinkPopover {
     this.#target.title = this.#target.textContent;
     this.#actions.hidden = false;
     this.#form.hidden = true;
-    for (const b of this.#actions.querySelectorAll("button")) b.hidden = !this.#view.editable;
+    this.#open.hidden = target === null || !followable(target);
+    for (const b of this.#editButtons) b.hidden = !this.#view.editable;
     this.#dom.hidden = false;
     this.#position();
   }
@@ -294,12 +342,22 @@ class LinkPopover {
   }
 }
 
-/** Shows a link's target under it, and edits links from the bubble or with Mod-k. */
-export function links(): Plugin {
+/**
+ * Shows a link's target under it, edits links from the bubble or with Mod-k, and follows links
+ * from the bubble or with Mod-click. `open` is called with the target of a link to another
+ * markdown file.
+ */
+export function links(open: (href: string) => void): Plugin {
   let popover: LinkPopover | null = null;
   return new Plugin({
     props: {
       handleKeyDown: keydownHandler({ "Mod-k": () => popover?.edit() ?? false }),
+      handleClick(view, pos, event) {
+        if (!(event.ctrlKey || event.metaKey)) return false;
+        const at = linkAround(view.state.doc.resolve(pos));
+        const target = at ? targetOf(view.state.doc, at.mark) : null;
+        return target !== null && follow(view, target, open);
+      },
       handleDOMEvents: {
         focus() {
           popover?.update();
@@ -312,7 +370,7 @@ export function links(): Plugin {
       },
     },
     view(view) {
-      popover = new LinkPopover(view);
+      popover = new LinkPopover(view, open);
       return {
         update() {
           popover?.update();

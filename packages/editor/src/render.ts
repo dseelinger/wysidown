@@ -1,4 +1,4 @@
-import { schema } from "@wysidown/core";
+import { schema, type Resources } from "@wysidown/core";
 import {
   DOMParser,
   DOMSerializer,
@@ -9,6 +9,7 @@ import {
 } from "prosemirror-model";
 import type { MarkViewConstructor, NodeViewConstructor } from "prosemirror-view";
 import { codeBlockView } from "./code.ts";
+import { imageView } from "./images.ts";
 import { listItemView } from "./lists.ts";
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -84,8 +85,14 @@ export const clipboardParser = DOMParser.fromSchema(schema);
 /** Writes document content to the DOM, for the clipboard. */
 export const serializer = new DOMSerializer(nodes, marks);
 
-/** View constructors for every node type and mark, so the core schema needs no DOM specs. */
-export function views(document: Document): {
+/**
+ * View constructors for every node type and mark, so the core schema needs no DOM specs. Images
+ * resolve against `resources` when they are drawn.
+ */
+export function views(
+  document: Document,
+  resources: () => Resources,
+): {
   nodeViews: Record<string, NodeViewConstructor>;
   markViews: Record<string, MarkViewConstructor>;
 } {
@@ -95,6 +102,7 @@ export function views(document: Document): {
   }
   nodeViews["list_item"] = listItemView(document);
   nodeViews["code_block"] = codeBlockView(document);
+  nodeViews["image"] = imageView(document, resources);
   const markViews: Record<string, MarkViewConstructor> = {};
   for (const [name, spec] of Object.entries(marks)) {
     markViews[name] = (mark) => DOMSerializer.renderSpec(document, spec(mark));

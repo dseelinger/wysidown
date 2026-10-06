@@ -25,13 +25,21 @@ export interface Opened {
   errors: string[];
 }
 
+/** More to set up before VS Code starts. */
+export interface OpenOptions {
+  /** Files to write beside the fixture, by path relative to its folder. */
+  files?: Record<string, string | Uint8Array>;
+  /** User settings added to the test's own. */
+  settings?: Record<string, unknown>;
+}
+
 /** A test that opens a copy of a realistic corpus fixture in Wysidown and fails on any error from its webview. */
-export const test = base.extend<{ open: (fixture: string) => Promise<Opened> }>({
+export const test = base.extend<{ open: (fixture: string, options?: OpenOptions) => Promise<Opened> }>({
   open: async ({ playwright: _playwright }, use) => {
     const apps: ElectronApplication[] = [];
     const opened: Opened[] = [];
-    await use(async (name) => {
-      const result = await open(name, apps);
+    await use(async (name, options = {}) => {
+      const result = await open(name, apps, options);
       opened.push(result);
       return result;
     });
@@ -77,7 +85,7 @@ async function vscodeExecutable(): Promise<string> {
  * Wysidown as the editor for markdown. The window is moved to a display other than the primary
  * one when there is one. Starts again when the file opened in the text editor instead.
  */
-async function open(name: string, apps: ElectronApplication[]): Promise<Opened> {
+async function open(name: string, apps: ElectronApplication[], options: OpenOptions): Promise<Opened> {
   const executablePath = await vscodeExecutable();
   for (let attempt = 1; ; attempt++) {
     const root = mkdtempSync(join(tmpdir(), "wysidown-vscode-"));
@@ -87,6 +95,10 @@ async function open(name: string, apps: ElectronApplication[]): Promise<Opened> 
     mkdirSync(folder);
     mkdirSync(settings, { recursive: true });
     copyFileSync(join(corpus, name), path);
+    for (const [file, bytes] of Object.entries(options.files ?? {})) {
+      mkdirSync(dirname(join(folder, file)), { recursive: true });
+      writeFileSync(join(folder, file), bytes);
+    }
     writeFileSync(
       join(settings, "settings.json"),
       JSON.stringify({
@@ -96,6 +108,7 @@ async function open(name: string, apps: ElectronApplication[]): Promise<Opened> 
         "update.mode": "none",
         "telemetry.telemetryLevel": "off",
         "window.dialogStyle": "custom",
+        ...options.settings,
       }),
     );
     const app = await electron.launch({

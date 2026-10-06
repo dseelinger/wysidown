@@ -20,6 +20,16 @@
   "main": "./dist/extension.cjs",
   "activationEvents": [],
   "contributes": {
+    "configuration": {
+      "title": "Wysidown",
+      "properties": {
+        "wysidown.remoteImages": {
+          "type": "boolean",
+          "default": true,
+          "description": "Load images from the web in the Wysidown editor. When off, they show as placeholders."
+        }
+      }
+    },
     "customEditors": [
       {
         "viewType": "wysidown.markdown",

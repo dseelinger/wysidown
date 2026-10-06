@@ -8,21 +8,40 @@ export { expect };
 export interface Launched {
   app: ElectronApplication;
   window: Page;
-  /** Console errors, console warnings and page errors seen so far. */
+  /** Console errors, console warnings and page errors seen so far, except for images on disk that are not found. */
   errors: string[];
 }
 
-/** Starts the built app with `args` on its command line and waits for its window. */
+/**
+ * Starts the built app with `args` on its command line and waits for its window. The app keeps its
+ * settings in a new temporary folder unless `args` names one with `--user-data-dir=`.
+ */
 export async function launch(...args: string[]): Promise<Launched> {
-  const app = await electron.launch({ args: [join(import.meta.dirname, "..", "dist", "main.cjs"), ...args] });
+  const userData = args.some((a) => a.startsWith("--user-data-dir=")) ? [] : [userDataArgument(newFolder())];
+  const app = await electron.launch({
+    args: [join(import.meta.dirname, "..", "dist", "main.cjs"), ...userData, ...args],
+  });
   const window = await app.firstWindow();
   const errors: string[] = [];
   window.on("console", (m) => {
-    if (m.type() === "error" || m.type() === "warning") errors.push(m.text());
+    if (m.type() !== "error" && m.type() !== "warning") return;
+    if (missingImage(m.text(), m.location().url)) return;
+    errors.push(m.text());
   });
   window.on("pageerror", (e) => errors.push(e.message));
   await window.waitForLoadState("domcontentloaded");
   return { app, window, errors };
+}
+
+/**
+ * True for the console error Chromium logs when an image the document names is not on disk, or
+ * the app refuses it: the fixtures are copied without their images.
+ */
+function missingImage(text: string, url: string): boolean {
+  return (
+    url.startsWith("wysidown-file:") &&
+    text === "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  );
 }
 
 /** A realistic corpus fixture's text. */
@@ -40,7 +59,17 @@ export function copyFixture(name: string, change?: (text: string) => string): st
 
 /** A path in a new temporary folder; the file does not exist. */
 export function newPath(name: string): string {
-  return join(mkdtempSync(join(tmpdir(), "wysidown-")), name);
+  return join(newFolder(), name);
+}
+
+/** A new, empty temporary folder. */
+export function newFolder(): string {
+  return mkdtempSync(join(tmpdir(), "wysidown-"));
+}
+
+/** The argument that makes the app keep its settings in `folder`. */
+export function userDataArgument(folder: string): string {
+  return `--user-data-dir=${folder.replaceAll("\\", "/")}`;
 }
 
 export function writeText(path: string, text: string): void {
@@ -51,8 +80,8 @@ export function readText(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-/** Clicks a File menu item by its id: open, save or save-as. */
-export async function menu(app: ElectronApplication, id: "open" | "save" | "save-as"): Promise<void> {
+/** Clicks a menu item by its id. */
+export async function menu(app: ElectronApplication, id: "open" | "save" | "save-as" | "remote-images"): Promise<void> {
   await app.evaluate(({ Menu }, itemId) => {
     const item = Menu.getApplicationMenu()!.getMenuItemById(itemId)!;
     (item.click as () => void)();

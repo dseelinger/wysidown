@@ -82,6 +82,8 @@ export class Session {
         this.#flushAsked = message.id;
         this.#flush();
         return null;
+      case "resources":
+        return null;
     }
   }
 

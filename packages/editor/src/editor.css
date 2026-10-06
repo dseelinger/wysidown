@@ -95,8 +95,30 @@
   cursor: pointer;
 }
 
-.ProseMirror .image::before {
+.ProseMirror .image img {
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.ProseMirror .image.ProseMirror-selectednode img {
+  outline: 2px solid Highlight;
+}
+
+.ProseMirror .image[data-placeholder] {
+  padding: 0 0.3em;
+  border: 1px dashed color-mix(in srgb, currentcolor 40%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, currentcolor 6%, transparent);
+  font-size: 0.9em;
+  cursor: default;
+}
+
+.ProseMirror .image[data-placeholder]::before {
   content: "🖼 ";
+}
+
+.ProseMirror .image[data-placeholder="remote"]::before {
+  content: "🌐 ";
 }
 
 .ProseMirror table {

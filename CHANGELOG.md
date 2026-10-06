@@ -5,6 +5,17 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Images are shown. An image path is read relative to the markdown file, and a path starting with
+  `/` relative to the top of the file's git repository (or the file's folder when it is not in
+  one). An image that cannot be found or read shows as a box with its alt text; hovering over the
+  box shows the path. Images on your disk load only from inside that repository or folder. Images
+  from the web load unless you turn them off: in the desktop app with View > Load Images from the
+  Web, which is remembered, and in VS Code with the `wysidown.remoteImages` setting. While they
+  are off, each shows as a box with its alt text. Ctrl+click on a link to another markdown file,
+  such as `[guide](docs/install.md)`, opens that file in Wysidown; in the desktop app it replaces
+  the open document, asking first if it has unsaved changes. Ctrl+click on a link to a heading in
+  the same file, such as `[Usage](#usage)`, moves the cursor to that heading and scrolls it to
+  the top. The box that shows a link's target has an Open button for both kinds of link.
 - Links can be edited. Putting the cursor in a link shows where it goes in a box under it, with
   Edit and Remove buttons. Edit, or Ctrl+K, opens a form with the link's text and URL; Enter
   saves it and Escape closes it. Ctrl+K with text selected makes the text a link, and with nothing

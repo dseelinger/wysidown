@@ -1,9 +1,10 @@
-import type { EditorMessage, HostMessage } from "@wysidown/core";
+import type { EditorMessage, HostMessage, Resources } from "@wysidown/core";
 import { baseKeymap } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
-import { EditorView } from "prosemirror-view";
+import { EditorView, type DirectEditorProps } from "prosemirror-view";
 import { codeKeys } from "./code.ts";
+import { noResources } from "./images.ts";
 import { links } from "./links.ts";
 import { listKeys } from "./lists.ts";
 import { clipboardParser, domParser, serializer, views } from "./render.ts";
@@ -40,12 +41,16 @@ export function createEditor(
     keymap(listKeys),
     keymap(baseKeymap),
     tables(),
-    links(),
+    links((href) => {
+      post({ type: "open", href });
+    }),
   ];
+  let resources: Resources = noResources;
+  const document = place.ownerDocument;
   const session = new Session(post, plugins);
   const view = new EditorView(place, {
     state: session.state,
-    ...views(place.ownerDocument),
+    ...views(document, () => resources),
     domParser,
     clipboardParser,
     clipboardSerializer: serializer,
@@ -59,8 +64,20 @@ export function createEditor(
   post({ type: "ready" });
   return {
     receive(message) {
+      // New resources and a new document are drawn together, so the old document's images are not
+      // requested from the new folder.
+      const props: Partial<DirectEditorProps> = {};
+      const next = message.type === "resources" ? message : message.type === "load" ? message.resources : undefined;
+      if (
+        next &&
+        (next.base !== resources.base || next.root !== resources.root || next.remoteImages !== resources.remoteImages)
+      ) {
+        resources = { base: next.base, root: next.root, remoteImages: next.remoteImages };
+        props.nodeViews = views(document, () => resources).nodeViews;
+      }
       const state = session.receive(message);
-      if (state) view.updateState(state);
+      if (state) props.state = state;
+      if (props.state || props.nodeViews) view.setProps(props);
     },
     view,
     destroy() {

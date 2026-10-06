@@ -8,10 +8,23 @@ import type { TextEdit } from "../text/edits.ts";
  * computed against.
  */
 
+/** Where the document's images and links lead. */
+export interface Resources {
+  /** A URL ending in `/` that relative paths resolve against: the document's folder. Null when the document has no file. */
+  base: string | null;
+  /**
+   * A URL ending in `/` that paths starting with `/` resolve against: the repository root, or the
+   * document's folder outside a repository. The host serves no file outside it. Null when `base` is.
+   */
+  root: string | null;
+  /** False when images from the web are not loaded. */
+  remoteImages: boolean;
+}
+
 /** Sent by the host. */
 export type HostMessage =
-  /** The document to show, replacing any other. */
-  | { type: "load"; text: string; version: number }
+  /** The document to show, replacing any other, and where its images and links lead when that changed. */
+  | { type: "load"; text: string; version: number; resources?: Resources }
   /**
    * The text changed outside the editor (another editor, undo in the host, a file change on disk),
    * or the host did not apply an edit. The editor's edits not yet accepted are discarded.
@@ -23,7 +36,9 @@ export type HostMessage =
    * The host is about to read its text (to save it, or to ask whether to save it) and waits for
    * `flushed`. `id` increases with each `flush`.
    */
-  | { type: "flush"; id: number };
+  | { type: "flush"; id: number }
+  /** Where the document's images and links now lead. */
+  | ({ type: "resources" } & Resources);
 
 /** Sent by the editor. */
 export type EditorMessage =
@@ -42,4 +57,9 @@ export type EditorMessage =
    * or replaced by the host's text. Messages before it are handled first. `id` is that of the
    * latest `flush` answered; earlier ones are answered with it.
    */
-  | { type: "flushed"; id: number };
+  | { type: "flushed"; id: number }
+  /**
+   * The user followed a link to another markdown file. `href` is the link's target as written,
+   * for the host to open the file it names (see `markdownLinkPath`).
+   */
+  | { type: "open"; href: string };

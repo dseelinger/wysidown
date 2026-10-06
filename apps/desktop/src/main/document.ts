@@ -1,4 +1,4 @@
-import { applyEdits, type EditorMessage, type HostMessage, type TextEdit } from "@wysidown/core";
+import { applyEdits, type EditorMessage, type HostMessage, type Resources, type TextEdit } from "@wysidown/core";
 
 /** The document a window shows: its text, the file it came from, and whether it has unsaved changes. */
 export class HostDocument {
@@ -7,6 +7,7 @@ export class HostDocument {
   #path: string | null = null;
   #text = "";
   #saved = "";
+  #resources: Resources = { base: null, root: null, remoteImages: false };
   #version = 1;
   /** The version of the latest `load` or `changed` sent. */
   #told = 1;
@@ -37,7 +38,7 @@ export class HostDocument {
   receive(message: unknown): void {
     if (isReady(message)) {
       this.#told = this.#version;
-      this.#send({ type: "load", text: this.#text, version: this.#version });
+      this.#send({ type: "load", text: this.#text, version: this.#version, resources: this.#resources });
       return;
     }
     if (isFlushed(message)) {
@@ -82,14 +83,24 @@ export class HostDocument {
     });
   }
 
-  /** Shows `text`, read from `path`, as the document; it starts with no unsaved changes. */
-  load(text: string, path: string | null): void {
+  /**
+   * Shows `text`, read from `path`, as the document, with its images and links leading to
+   * `resources`; it starts with no unsaved changes.
+   */
+  load(text: string, path: string | null, resources: Resources): void {
     this.#path = path;
     this.#text = text;
     this.#saved = text;
+    this.#resources = resources;
     this.#told = ++this.#version;
-    this.#send({ type: "load", text, version: this.#version });
+    this.#send({ type: "load", text, version: this.#version, resources });
     this.#onDirtyChange();
+  }
+
+  /** Tells the editor where the document's images and links now lead. */
+  setResources(resources: Resources): void {
+    this.#resources = resources;
+    this.#send({ type: "resources", ...resources });
   }
 
   /** Records that the current text was written to `path`. */
