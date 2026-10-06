@@ -10,7 +10,7 @@ import { math } from "micromark-extension-math";
 import type { Attrs, Mark, Node } from "prosemirror-model";
 import { mapText } from "./map-text.ts";
 import { schema } from "./schema.ts";
-import type { CharMap, MarkdownSource, Range } from "./source.ts";
+import type { CharMap, LinkSpan, MarkdownSource, Range } from "./source.ts";
 import { detectStyle } from "./style.ts";
 
 const frontmatterKinds = ["yaml", "toml"] as const;
@@ -28,6 +28,13 @@ interface Piece {
   start: number[];
   end: number[];
   run: number[];
+}
+
+/** A textblock's inline content as it is read: its pieces, its links, and the positions they take. */
+interface Inline {
+  pieces: Piece[];
+  links: LinkSpan[];
+  size: number;
 }
 
 const unknown: Range = { start: -1, end: -1 };
@@ -71,13 +78,27 @@ export function parseMarkdown(input: string): MarkdownSource {
     };
   };
 
-  const inline = (nodes: readonly M.PhrasingContent[], marks: readonly Mark[], out: Piece[]): void => {
+  const push = (out: Inline, piece: Piece) => {
+    out.pieces.push(piece);
+    out.size += piece.start.length;
+  };
+
+  /** The source span of a link's text; see `LinkSpan`. */
+  const linkText = (n: M.Link | M.LinkReference, r: Range) => {
+    const opening = text[r.start];
+    if (opening === "<") return { textStart: r.start + 1, textEnd: r.end - 1 };
+    if (opening !== "[") return { textStart: r.start, textEnd: r.end };
+    const last = n.children[n.children.length - 1];
+    return { textStart: r.start + 1, textEnd: last ? rangeOf(last).end : r.start + 1 };
+  };
+
+  const inline = (nodes: readonly M.PhrasingContent[], marks: readonly Mark[], out: Inline): void => {
     for (const n of nodes) {
       const r = rangeOf(n);
       switch (n.type) {
         case "text": {
           const piece = textPiece(n.value, marks, r.start, r.end);
-          if (piece) out.push(piece);
+          if (piece) push(out, piece);
           break;
         }
         case "inlineCode": {
@@ -90,7 +111,7 @@ export function parseMarkdown(input: string): MarkdownSource {
             to--;
           }
           const piece = textPiece(n.value, schema.marks.code.create().addToSet(marks), from, to);
-          out.push(piece ?? atom(schema.nodes.raw_inline.create({ source: raw }, null, marks), n));
+          push(out, piece ?? atom(schema.nodes.raw_inline.create({ source: raw }, null, marks), n));
           break;
         }
         case "emphasis":
@@ -103,33 +124,40 @@ export function parseMarkdown(input: string): MarkdownSource {
           inline(n.children, schema.marks.strike.create().addToSet(marks), out);
           break;
         case "link":
-          inline(n.children, schema.marks.link.create({ href: n.url, title: n.title ?? null }).addToSet(marks), out);
-          break;
         case "linkReference": {
-          const attrs = { identifier: n.identifier, label: n.label ?? null, referenceType: n.referenceType };
+          const attrs =
+            n.type === "link"
+              ? { href: n.url, title: n.title ?? null }
+              : { identifier: n.identifier, label: n.label ?? null, referenceType: n.referenceType };
+          const from = out.size;
           inline(n.children, schema.marks.link.create(attrs).addToSet(marks), out);
+          const textSpan = linkText(n, r);
+          if (r.start >= 0 && textSpan.textEnd >= 0 && out.size > from) {
+            out.links.push({ from, to: out.size, start: r.start, end: r.end, ...textSpan });
+          }
           break;
         }
         case "break":
-          out.push(atom(schema.nodes.hard_break.create(null, null, marks), n));
+          push(out, atom(schema.nodes.hard_break.create(null, null, marks), n));
           break;
         case "image": {
           const attrs = { src: n.url, alt: n.alt ?? "", title: n.title ?? null };
-          out.push(atom(schema.nodes.image.create(attrs, null, marks), n));
+          push(out, atom(schema.nodes.image.create(attrs, null, marks), n));
           break;
         }
         default: {
           const reference = n.type === "footnoteReference" || n.type === "imageReference";
           const attrs = { source: sourceOf(n), identifier: reference ? n.identifier : null };
-          out.push(atom(schema.nodes.raw_inline.create(attrs, null, marks), n));
+          push(out, atom(schema.nodes.raw_inline.create(attrs, null, marks), n));
         }
       }
     }
   };
 
   const textblock = (type: string, attrs: Attrs | null, n: M.Parent): Node => {
-    const pieces: Piece[] = [];
-    inline(n.children as M.PhrasingContent[], [], pieces);
+    const out: Inline = { pieces: [], links: [], size: 0 };
+    inline(n.children as M.PhrasingContent[], [], out);
+    const { pieces } = out;
     const pm = schema.nodes[type]!.create(
       attrs,
       pieces.map((p) => p.node),
@@ -142,6 +170,7 @@ export function parseMarkdown(input: string): MarkdownSource {
       run: pieces.flatMap((p) => p.run),
       contentStart: first.start,
       contentEnd: last.end,
+      links: out.links,
     });
     return recorded(pm, n);
   };

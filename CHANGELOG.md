@@ -5,6 +5,14 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Links can be edited. Putting the cursor in a link shows where it goes in a box under it, with
+  Edit and Remove buttons. Edit, or Ctrl+K, opens a form with the link's text and URL; Enter
+  saves it and Escape closes it. Ctrl+K with text selected makes the text a link, and with nothing
+  selected inserts a new one. Saving changes only the link's own markdown: a new URL replaces
+  just the URL and keeps the title and the text as written, a new link adds brackets around text
+  that is otherwise left alone, and Remove leaves the text without its brackets. A reference link
+  such as `[guide][guide]` gets its new URL in its definition line. An autolink such as
+  `<https://example.com>` keeps showing its URL when the URL changes. Links are underlined.
 - Code blocks keep their fences when edited. Saving after typing in a code block rewrites only the
   lines you changed: the fence (backticks or tildes, and how many), its indentation, the info
   string and the other lines stay as they were, and a new line inside a quote or list item gets

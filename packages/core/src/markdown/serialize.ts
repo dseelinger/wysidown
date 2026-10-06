@@ -1,7 +1,7 @@
 import { byteOrderMark } from "../text/byte-order-mark.ts";
-import type { Mark, Node } from "prosemirror-model";
+import { Fragment, type Mark, type Node } from "prosemirror-model";
 import { schema } from "./schema.ts";
-import type { CharMap, MarkdownSource } from "./source.ts";
+import type { CharMap, LinkSpan, MarkdownSource } from "./source.ts";
 import { verify } from "./verify.ts";
 import { writeBlocks, writeCell } from "./write.ts";
 
@@ -152,7 +152,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
       if (!sameAttrs(original, edited)) return null;
       if (original.eq(edited)) return slice(original);
       return (
-        (options.inlineSplice ? spliceInline(original, edited) : null) ??
+        (options.inlineSplice ? (spliceInline(original, edited) ?? spliceLink(original, edited)) : null) ??
         (options.inlineRewrite ? rewriteInline(original, edited, prefix) : null)
       );
     }
@@ -307,6 +307,150 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     const r = range(original);
     const insertedText = inserted.map((x) => x.char).join("");
     return text.slice(r.start, from) + escapeInline(insertedText) + text.slice(to, r.end);
+  };
+
+  /**
+   * Writes a textblock in which one link was added, removed or given a new target, rewriting only
+   * that link's syntax and keeping its text as written. A link whose text changed as well takes the
+   * text edit as `spliceInline` would. An autolink whose text still names its target stays an
+   * autolink.
+   */
+  const spliceLink = (original: Node, edited: Node): string | null => {
+    const map = source.chars.get(original);
+    if (!map) return null;
+    const a = flatten(original);
+    const b = flatten(edited);
+    let from = 0;
+    while (from < a.length && from < b.length && sameItem(a[from]!, b[from]!)) from++;
+    let suf = 0;
+    while (suf < a.length - from && suf < b.length - from && sameItem(a[a.length - 1 - suf]!, b[b.length - 1 - suf]!)) {
+      suf++;
+    }
+    let endA = a.length - suf;
+    let endB = b.length - suf;
+    const spans = linkSpans(b);
+    if (from === endA && from < endB) return insertLink(original, a, b.slice(from, endB), from, spans);
+    if (from === endA || from === endB) return null;
+
+    /** Widens the changed stretch to take in a link that overlaps it; true when it grew. */
+    const takeIn = (start: number, end: number, inOriginal: boolean) => {
+      const own = inOriginal ? endA : endB;
+      if (start >= own || end <= from) return false;
+      const grow = Math.max(0, end - own);
+      endA += grow;
+      endB += grow;
+      const earlier = start < from;
+      if (earlier) from = start;
+      return earlier || grow > 0;
+    };
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const l of map.links) grew = takeIn(l.from, l.to, true) || grew;
+      for (const l of spans) grew = takeIn(l.from, l.to, false) || grew;
+    }
+
+    const inA = map.links.filter((l) => l.from >= from && l.to <= endA);
+    const inB = spans.filter((l) => l.from >= from && l.to <= endB);
+    const old = inA.length === 1 && inA[0]!.from === from && inA[0]!.to === endA ? inA[0]! : null;
+    const now = inB.length === 1 && inB[0]!.from === from && inB[0]!.to === endB ? linkOf(b[from]!) : null;
+    const sameText =
+      endA - from === endB - from && a.slice(from, endA).every((x, k) => sameExceptLink(x, b[from + k]!));
+    const r = range(original);
+    const at = (offset: number) => offset - r.start;
+    const body = slice(original);
+
+    if (!old) {
+      // A new link around text that had none.
+      if (!now || !sameText || inA.length > 0 || a.slice(from, endA).some((x) => linkOf(x))) return null;
+      const start = map.start[from]!;
+      const end = map.end[endA - 1]!;
+      const written = linkTail(now);
+      if (start < 0 || end < 0 || written === null) return null;
+      return body.slice(0, at(start)) + "[" + body.slice(at(start), at(end)) + written + body.slice(at(end));
+    }
+
+    const bracketed = text[old.start] === "[";
+    if (!now) {
+      // A link taken off its text.
+      if (!sameText || inB.length > 0 || !bracketed) return null;
+      return body.slice(0, at(old.start)) + text.slice(old.textStart, old.textEnd) + body.slice(at(old.end));
+    }
+
+    const was = linkOf(a[from]!)!;
+    if (!bracketed) {
+      const shown = b.slice(from, endB).map((x) => x.char);
+      if (shown.some((c) => c === null)) return null;
+      const plain = shown.join("");
+      const angle = text[old.start] === "<";
+      let written: string | null;
+      if (namesItsTarget(now, plain, angle) && (!angle || autolinkable(plain))) written = angle ? `<${plain}>` : plain;
+      else {
+        const tail = linkTail(now);
+        const shownText = sameText ? text.slice(old.textStart, old.textEnd) : escapeInline(plain);
+        written = tail === null ? null : "[" + shownText + tail;
+      }
+      if (written === null) return null;
+      return body.slice(0, at(old.start)) + written + body.slice(at(old.end));
+    }
+
+    const retexted = sameText ? body : spliceInline(original, relink(edited, from, endB, was));
+    const written = retargetTail(old, was, now);
+    if (retexted === null || written === null) return null;
+    const delta = retexted.length - body.length;
+    return retexted.slice(0, at(old.textEnd + delta)) + written + retexted.slice(at(old.end + delta));
+  };
+
+  /**
+   * Writes `original`, whose items are `a`, with the link `inserted` added at position `at`, next to
+   * text with the same marks. A link whose text is its target is written as an autolink.
+   */
+  const insertLink = (
+    original: Node,
+    a: readonly Item[],
+    inserted: readonly Item[],
+    at: number,
+    spans: readonly { from: number; to: number }[],
+  ): string | null => {
+    const map = source.chars.get(original);
+    if (!map || !spans.some((l) => l.from === at && l.to === at + inserted.length)) return null;
+    const now = linkOf(inserted[0]!)!;
+    const marks = withoutLink(inserted[0]!.marks);
+    if (inserted.some((x) => x.char === null || x.char === "\n" || !sameMarks(withoutLink(x.marks), marks)))
+      return null;
+    const next = (k: number) => {
+      const x = a[k];
+      return x?.char != null && map.run[k]! >= 0 && sameMarks(withoutLink(x.marks), marks) && !linkOf(x);
+    };
+    const offset = next(at - 1) ? map.end[at - 1]! : next(at) ? map.start[at]! : -1;
+    if (offset < 0) return null;
+    const shown = inserted.map((x) => x.char).join("");
+    const angle = namesItsTarget(now, shown, true) && autolinkable(shown);
+    const tail = angle ? "" : linkTail(now);
+    if (tail === null) return null;
+    const r = range(original);
+    const written = angle ? `<${shown}>` : "[" + escapeInline(shown) + tail;
+    return text.slice(r.start, offset) + written + text.slice(offset, r.end);
+  };
+
+  /** The syntax of `link` from the closing bracket of its text on; null when it cannot be written. */
+  const linkTail = (link: Mark): string | null => {
+    const identifier = link.attrs["identifier"] as string | null;
+    if (identifier !== null) return `][${(link.attrs["label"] as string | null) ?? identifier}]`;
+    const written = writeBlocks([schema.nodes.paragraph.create(null, schema.text("x", [link]))], source.style);
+    return written.startsWith("[x](") && written.endsWith(")") ? written.slice(2) : null;
+  };
+
+  /**
+   * The syntax of `link` in place of `old`'s, from the closing bracket of its text on. When both are
+   * inline links with the same title, only the destination is rewritten.
+   */
+  const retargetTail = (old: LinkSpan, was: Mark, link: Mark): string | null => {
+    const inline = was.attrs["identifier"] === null && link.attrs["identifier"] === null;
+    const destination = inline && was.attrs["title"] === link.attrs["title"] ? destinationAt(text, old.textEnd) : null;
+    if (!destination || destination.end > old.end) return linkTail(link);
+    const bare = linkTail(schema.marks.link.create({ href: link.attrs["href"] as string }));
+    if (bare === null) return null;
+    return text.slice(old.textEnd, destination.start) + bare.slice(2, -1) + text.slice(destination.end, old.end);
   };
 
   /** Rewrites a textblock's inline content, keeping its own syntax (heading marker, cell pipes) from the source. */
@@ -840,4 +984,79 @@ function sameItem(a: Item, b: Item): boolean {
 /** Backslash-escapes characters that could start markdown syntax inside a line. */
 function escapeInline(value: string): string {
   return value.replace(/[\\`*_[\]<>&|~$]/g, "\\$&");
+}
+
+function linkOf(item: Item): Mark | null {
+  return item.marks.find((m) => m.type === schema.marks.link) ?? null;
+}
+
+/** The stretches of `items` under one link, as positions. */
+function linkSpans(items: readonly Item[]): { from: number; to: number }[] {
+  const out: { from: number; to: number }[] = [];
+  for (let k = 0; k < items.length;) {
+    const link = linkOf(items[k]!);
+    let end = k + 1;
+    if (link) {
+      while (end < items.length && linkOf(items[end]!)?.eq(link)) end++;
+      out.push({ from: k, to: end });
+    }
+    k = end;
+  }
+  return out;
+}
+
+/** True when two items are the same but for their link. */
+function sameExceptLink(a: Item, b: Item): boolean {
+  if (!sameMarks(withoutLink(a.marks), withoutLink(b.marks))) return false;
+  if (a.char === null || b.char === null) return a.char === b.char && a.node.mark([]).eq(b.node.mark([]));
+  return a.char === b.char;
+}
+
+/** `block` with positions `from` to `to` of its content under `link` in place of their own link. */
+function relink(block: Node, from: number, to: number, link: Mark): Node {
+  const middle: Node[] = [];
+  block.content.cut(from, to).forEach((n) => middle.push(n.mark(link.addToSet(n.marks))));
+  return block.copy(block.content.cut(0, from).append(Fragment.from(middle)).append(block.content.cut(to)));
+}
+
+/** True when an autolink showing `shown` would have `link`'s target; `angle` for one in angle brackets. */
+function namesItsTarget(link: Mark, shown: string, angle: boolean): boolean {
+  if (link.attrs["identifier"] !== null || link.attrs["title"] !== null) return false;
+  const href = link.attrs["href"] as string;
+  return href === shown || href === "mailto:" + shown || (!angle && href === "http://" + shown);
+}
+
+/** True when `shown` in angle brackets is an autolink: a URL with a scheme, or an email address. */
+function autolinkable(shown: string): boolean {
+  return /^(?:[a-z][a-z\d+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)$/i.test(shown);
+}
+
+/**
+ * The span of an inline link's destination, given the offset of the bracket that closes its text;
+ * null when no `(` follows it.
+ */
+function destinationAt(text: string, closing: number): { start: number; end: number } | null {
+  if (text[closing] !== "]" || text[closing + 1] !== "(") return null;
+  const start = closing + 2 + /^[ \t]*(?:\r?\n[ \t>]*)?/.exec(text.slice(closing + 2))![0].length;
+  let at = start;
+  if (text[at] === "<") {
+    for (at++; at < text.length && text[at] !== ">"; at++) {
+      if (text[at] === "\\") at++;
+      else if (text[at] === "\n" || text[at] === "<") return null;
+    }
+    return at < text.length ? { start, end: at + 1 } : null;
+  }
+  let depth = 0;
+  for (; at < text.length; at++) {
+    const c = text[at]!;
+    if (c === "\\") at++;
+    else if (c === "(") depth++;
+    else if (c === ")" && depth-- === 0) break;
+    else if (c <= " ") break;
+  }
+  return { start, end: at };
+}
+
+function withoutLink(marks: readonly Mark[]): readonly Mark[] {
+  return marks.filter((m) => m.type !== schema.marks.link);
 }

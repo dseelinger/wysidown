@@ -18,6 +18,22 @@ export interface CharMap {
   /** Source span of the whole inline content, delimiters included; -1 when unknown. */
   contentStart: number;
   contentEnd: number;
+  /** The block's links whose source span is known, in order. */
+  links: LinkSpan[];
+}
+
+/** Where a link is: `from` and `to` are positions within the block, the rest source offsets. */
+export interface LinkSpan {
+  from: number;
+  to: number;
+  start: number;
+  end: number;
+  /**
+   * The span of the link's text: inside the brackets (`textEnd` is the closing bracket), inside
+   * the angle brackets of an autolink, or the whole of a bare autolink.
+   */
+  textStart: number;
+  textEnd: number;
 }
 
 /** Markers the fallback writer uses, taken from the most frequent choice in the document. */

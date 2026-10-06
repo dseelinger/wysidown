@@ -27,3 +27,8 @@ export function realisticCases(): { name: string; text: string }[] {
       ];
     });
 }
+
+/** A realistic corpus document's text, as stored. */
+export function fixture(name: string): string {
+  return readFileSync(join(repoRoot(), "packages", "core", "test", "corpus", "realistic", name), "utf8");
+}

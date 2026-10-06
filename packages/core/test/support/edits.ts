@@ -50,7 +50,10 @@ export type EditKind =
   | "align"
   | "code word"
   | "code line"
-  | "language";
+  | "language"
+  | "link target"
+  | "add link"
+  | "remove link";
 
 /** Applies every edit of one kind to `input`, one at a time, and classifies each. */
 export function editCases(input: string, kind: EditKind): Case[] {
@@ -262,9 +265,50 @@ export function editCases(input: string, kind: EditKind): Case[] {
         );
       }
       break;
+    case "link target":
+    case "remove link":
+      for (const { node, pos } of textblocks(source.doc)) {
+        for (const link of source.chars.get(node)?.links ?? []) {
+          const mark = node
+            .child(node.childBefore(link.from + 1).index)
+            .marks.find((m) => m.type === schema.marks.link)!;
+          const from = pos + 1 + link.from;
+          const to = pos + 1 + link.to;
+          const transform =
+            kind === "remove link"
+              ? new Transform(source.doc).removeMark(from, to, schema.marks.link)
+              : new Transform(source.doc).addMark(
+                  from,
+                  to,
+                  schema.marks.link.create({ href: linkHref, title: mark.attrs["title"] as string | null }),
+                );
+          record(transform, confinedTo(link.start, link.end));
+        }
+      }
+      break;
+    case "add link":
+      for (const { node, pos } of textblocks(source.doc)) {
+        const word = firstWord(node, (m) => m.type === schema.marks.link || m.type === schema.marks.code);
+        const map = source.chars.get(node)!;
+        if (!word || map.run[word.from]! < 0) continue;
+        const s = map.start[word.from]! + offset;
+        const e = map.end[word.to - 1]! + offset;
+        record(
+          new Transform(source.doc).addMark(
+            pos + 1 + word.from,
+            pos + 1 + word.to,
+            schema.marks.link.create({ href: linkHref }),
+          ),
+          (output) => output === input.slice(0, s) + "[" + input.slice(s, e) + `](${linkHref})` + input.slice(e),
+        );
+      }
+      break;
   }
   return cases;
 }
+
+/** The target the link edits give a link. */
+const linkHref = "https://example.com/edited";
 
 function codeBlocks(doc: Node): { node: Node; pos: number }[] {
   const out: { node: Node; pos: number }[] = [];
@@ -366,12 +410,15 @@ function textblocks(doc: Node): { node: Node; pos: number }[] {
   return out;
 }
 
-/** The first word of three or more letters in a textblock, as content offsets. */
-function firstWord(block: Node): { from: number; to: number; marks: readonly Mark[] } | null {
+/** The first word of three or more letters in a textblock, as content offsets, outside any mark `skip` names. */
+function firstWord(
+  block: Node,
+  skip: (mark: Mark) => boolean = () => false,
+): { from: number; to: number; marks: readonly Mark[] } | null {
   let offset = 0;
   let found: { from: number; to: number; marks: readonly Mark[] } | null = null;
   block.forEach((child) => {
-    if (!found && child.isText) {
+    if (!found && child.isText && !child.marks.some(skip)) {
       const m = /[A-Za-z]{3,}/.exec(child.text!);
       if (m) found = { from: offset + m.index, to: offset + m.index + m[0].length, marks: child.marks };
     }

@@ -162,3 +162,79 @@
   border: 0;
   border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
 }
+
+.ProseMirror a {
+  color: LinkText;
+  text-decoration: underline;
+  cursor: text;
+}
+
+.link-popover {
+  position: fixed;
+  z-index: 10;
+  max-width: min(32em, calc(100vw - 1em));
+  padding: 0.3em 0.5em;
+  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border-radius: 4px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 20%, transparent);
+  font:
+    0.9em system-ui,
+    sans-serif;
+}
+
+.link-popover[hidden],
+.link-popover [hidden] {
+  display: none;
+}
+
+.link-view {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.link-target {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.link-popover button {
+  padding: 0.15em 0.6em;
+  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-popover button:hover,
+.link-popover button:focus-visible {
+  background: color-mix(in srgb, CanvasText 10%, transparent);
+  outline: none;
+}
+
+.link-form {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3em 0.5em;
+  align-items: center;
+}
+
+.link-form label {
+  display: contents;
+}
+
+.link-form input {
+  min-width: 20em;
+  padding: 0.15em 0.3em;
+  border: 1px solid color-mix(in srgb, CanvasText 30%, transparent);
+  border-radius: 3px;
+  background: Canvas;
+  color: inherit;
+  font: inherit;
+}

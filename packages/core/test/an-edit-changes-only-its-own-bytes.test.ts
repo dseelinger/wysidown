@@ -20,6 +20,9 @@ const kinds: readonly EditKind[] = [
   "code word",
   "code line",
   "language",
+  "link target",
+  "add link",
+  "remove link",
 ];
 
 /** Realistic-corpus edits that change more than the edited block, by design. */
