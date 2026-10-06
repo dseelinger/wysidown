@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- In VS Code, a `.md` file can be opened in Wysidown with **Reopen Editor With… › Wysidown**; the
+  ordinary text editor stays the default. Edits made in Wysidown change only the characters you
+  typed. Undo, redo and save are VS Code's own, the file keeps its line endings and byte order
+  mark, and a change made in another editor of the same file shows in Wysidown straight away.
 - An empty file, a file holding only blank lines, and a new untitled document can be typed
   into. Deleting everything in a document leaves an empty line to type on, and saves an empty
   file.

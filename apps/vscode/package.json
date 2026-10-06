@@ -19,7 +19,20 @@
   ],
   "main": "./dist/extension.cjs",
   "activationEvents": [],
-  "contributes": {},
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "wysidown.markdown",
+        "displayName": "Wysidown",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ]
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "e2e": "vscode-test",

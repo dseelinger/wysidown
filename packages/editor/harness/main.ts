@@ -1,4 +1,4 @@
-// The browser harness: hosts the editor with an in-memory host, for Playwright.
+// The browser harness: hosts the editor with an in-memory host, for Playwright. `?undo=host` leaves undo to the host.
 import type { EditorMessage, HostMessage } from "@wysidown/core";
 import { createEditor } from "../src/index.ts";
 import type { Harness } from "./api.ts";
@@ -41,7 +41,7 @@ const host = new MemoryHost(toEditor);
 const toHost = channel<EditorMessage>((m) => {
   host.receive(m);
 });
-const editor = createEditor(place, toHost);
+const editor = createEditor(place, toHost, { history: new URLSearchParams(location.search).get("undo") !== "host" });
 
 const harness: Harness = {
   text: () => host.text,

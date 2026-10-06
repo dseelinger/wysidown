@@ -6,5 +6,6 @@
     "outDir": "dist-types"
   },
   "include": ["src", "test"],
+  "exclude": ["src/webview"],
   "references": [{ "path": "../../packages/core" }, { "path": "../../packages/editor" }]
 }

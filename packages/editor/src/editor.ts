@@ -13,12 +13,23 @@ export interface Editor {
   destroy(): void;
 }
 
+export interface EditorOptions {
+  /** False when the host owns undo and redo: the editor keeps no history and leaves their keys to the host. */
+  history?: boolean;
+}
+
 /**
  * Mounts the editor in `place` and sends `ready`. The host answers with `load`, and passes every
  * later message to `receive`. The editor reaches the host only through `post`.
  */
-export function createEditor(place: HTMLElement, post: (message: EditorMessage) => void): Editor {
-  const plugins = [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo }), keymap(baseKeymap)];
+export function createEditor(
+  place: HTMLElement,
+  post: (message: EditorMessage) => void,
+  options: EditorOptions = {},
+): Editor {
+  const undoable =
+    options.history === false ? [] : [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo })];
+  const plugins = [...undoable, keymap(baseKeymap)];
   const session = new Session(post, plugins);
   const view = new EditorView(place, {
     state: session.state,
