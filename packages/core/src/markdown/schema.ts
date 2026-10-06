@@ -27,8 +27,12 @@ export const schema = new Schema({
     table: { group: "block", content: "table_row+", attrs: { align: { default: [] } } },
     table_row: { content: "table_cell*" },
     table_cell: { content: "inline*" },
-    /** `kind` is the mdast type: definition, footnoteDefinition, html, yaml, toml or math. */
-    raw_block: { group: "block", atom: true, attrs: { source: {}, kind: {} } },
+    /**
+     * `kind` is the mdast type (definition, footnoteDefinition, html, yaml, toml or math), or
+     * `alert` for a top-level blockquote that starts with `[!NOTE]` and the like. `identifier` is
+     * the normalized label of a link or footnote definition.
+     */
+    raw_block: { group: "block", atom: true, attrs: { source: {}, kind: {}, identifier: { default: null } } },
     text: { group: "inline" },
     hard_break: { group: "inline", inline: true },
     image: {
@@ -37,7 +41,8 @@ export const schema = new Schema({
       atom: true,
       attrs: { src: {}, alt: { default: "" }, title: { default: null } },
     },
-    raw_inline: { group: "inline", inline: true, atom: true, attrs: { source: {} } },
+    /** `identifier` is the normalized label of a footnote or image reference. */
+    raw_inline: { group: "inline", inline: true, atom: true, attrs: { source: {}, identifier: { default: null } } },
   },
   marks: {
     link: {

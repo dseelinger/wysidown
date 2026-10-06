@@ -9,6 +9,7 @@ import {
 } from "@wysidown/core";
 import { Fragment, type Node } from "prosemirror-model";
 import { EditorState, Selection, type Plugin, type Transaction } from "prosemirror-state";
+import { fromHost, keepReferencedDefinitions } from "./definitions.ts";
 
 /**
  * The editor's side of the host protocol, with no view. Writes the document against the source of
@@ -30,8 +31,8 @@ export class Session {
 
   constructor(post: (message: EditorMessage) => void, plugins: readonly Plugin[] = []) {
     this.#post = post;
-    this.#plugins = plugins;
-    this.#state = EditorState.create({ schema, plugins: [...plugins] });
+    this.#plugins = [keepReferencedDefinitions, ...plugins];
+    this.#state = EditorState.create({ schema, plugins: [...this.#plugins] });
   }
 
   get state(): EditorState {
@@ -99,7 +100,7 @@ export class Session {
 
 /**
  * A transaction that turns `state.doc` into a document equal to `doc` by replacing only the
- * top-level blocks that differ. It is left out of the undo history.
+ * top-level blocks that differ. It is left out of the undo history and may delete definitions.
  */
 export function replaceChangedBlocks(state: EditorState, doc: Node): Transaction {
   const before = state.doc;
@@ -111,7 +112,7 @@ export function replaceChangedBlocks(state: EditorState, doc: Node): Transaction
     endBefore--;
     endAfter--;
   }
-  const tr = state.tr.setMeta("addToHistory", false);
+  const tr = state.tr.setMeta("addToHistory", false).setMeta(fromHost, true);
   if (start === endBefore && start === endAfter) return tr;
   const blocks: Node[] = [];
   for (let k = start; k < endAfter; k++) blocks.push(doc.child(k));

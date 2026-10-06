@@ -118,8 +118,11 @@ export function parseMarkdown(input: string): MarkdownSource {
           out.push(atom(schema.nodes.image.create(attrs, null, marks), n));
           break;
         }
-        default:
-          out.push(atom(schema.nodes.raw_inline.create({ source: sourceOf(n) }, null, marks), n));
+        default: {
+          const reference = n.type === "footnoteReference" || n.type === "imageReference";
+          const attrs = { source: sourceOf(n), identifier: reference ? n.identifier : null };
+          out.push(atom(schema.nodes.raw_inline.create(attrs, null, marks), n));
+        }
       }
     }
   };
@@ -141,6 +144,12 @@ export function parseMarkdown(input: string): MarkdownSource {
       contentEnd: last.end,
     });
     return recorded(pm, n);
+  };
+
+  const raw = (n: M.Node, kind: string): Node => {
+    const identifier =
+      n.type === "definition" || n.type === "footnoteDefinition" ? (n as M.Definition).identifier : null;
+    return recorded(schema.nodes.raw_block.create({ source: sourceOf(n), kind, identifier }), n);
   };
 
   const block = (n: M.Node): Node => {
@@ -178,14 +187,35 @@ export function parseMarkdown(input: string): MarkdownSource {
       case "tableCell":
         return textblock("table_cell", null, n as M.TableCell);
       default:
-        return recorded(schema.nodes.raw_block.create({ source: sourceOf(n), kind: n.type }), n);
+        return raw(n, n.type);
     }
   };
 
-  const doc = schema.nodes.doc.create(null, root.children.map(block));
+  const doc = schema.nodes.doc.create(
+    null,
+    root.children.map((n) => (isAlert(n, text) ? raw(n, "alert") : block(n))),
+  );
   ranges.set(doc, { start: 0, end: text.length });
   disjoinSiblings(doc, ranges);
   return { text, bom, eol, doc, ranges, chars, style: detectStyle(text, root) };
+}
+
+const alertMarker = /^\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(?:\r?\n|$)/i;
+
+/**
+ * True for a GitHub alert: a blockquote whose first line is only `[!NOTE]`, `[!TIP]` and the
+ * like, unescaped, and that holds no link or footnote definition.
+ */
+function isAlert(n: M.RootContent, text: string): boolean {
+  if (n.type !== "blockquote") return false;
+  const first = n.children[0];
+  const span = first?.type === "paragraph" ? first.position : undefined;
+  return span !== undefined && alertMarker.test(text.slice(span.start.offset, span.end.offset)) && !holdsDefinition(n);
+}
+
+function holdsDefinition(n: M.Node): boolean {
+  if (n.type === "definition" || n.type === "footnoteDefinition") return true;
+  return "children" in n && (n as M.Parent).children.some(holdsDefinition);
 }
 
 /** Text in the document model uses "\n" whatever the file uses; the file's line ending is restored on save. */

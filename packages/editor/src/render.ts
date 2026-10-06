@@ -11,7 +11,21 @@ import type { MarkViewConstructor, NodeViewConstructor } from "prosemirror-view"
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
 
-/** How each node type is shown. Raw syntax and images show their source text, read-only. */
+/** The label a raw block's chip shows, by `kind`. */
+const rawLabels: Record<string, string> = {
+  alert: "Alert",
+  definition: "Link definition",
+  footnoteDefinition: "Footnote",
+  html: "HTML",
+  math: "Math",
+  toml: "Front matter",
+  yaml: "Front matter",
+};
+
+/**
+ * How each node type is shown. Raw syntax shows as a chip holding its source text, read-only;
+ * a raw block's label is drawn by CSS from `data-label`, so it is not copied with the source.
+ */
 const nodes: Record<string, (node: Node) => DOMOutputSpec> = {
   paragraph: () => ["p", 0],
   heading: (n) => [`h${String(n.attrs["level"])}`, 0],
@@ -27,7 +41,10 @@ const nodes: Record<string, (node: Node) => DOMOutputSpec> = {
   table: () => ["table", ["tbody", 0]],
   table_row: () => ["tr", 0],
   table_cell: () => ["td", 0],
-  raw_block: (n) => ["pre", { class: "raw", "data-kind": str(n.attrs["kind"]) }, str(n.attrs["source"])],
+  raw_block: (n) => {
+    const kind = str(n.attrs["kind"]);
+    return ["pre", { class: "raw", "data-kind": kind, "data-label": rawLabels[kind] ?? kind }, str(n.attrs["source"])];
+  },
   hard_break: () => ["br"],
   image: (n) => ["span", { class: "image", title: str(n.attrs["src"]) }, str(n.attrs["alt"])],
   raw_inline: (n) => ["code", { class: "raw" }, str(n.attrs["source"])],
