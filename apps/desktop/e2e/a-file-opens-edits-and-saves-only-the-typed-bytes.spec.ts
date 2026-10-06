@@ -91,6 +91,22 @@ test("Save As writes to the chosen file, leaves the original alone, and names th
   }
 });
 
+test("Save on an untitled document asks where to save it", async () => {
+  const path = newPath("new.md");
+  const { app, window, errors } = await launch();
+  try {
+    await window.locator(".ProseMirror").click();
+    await window.keyboard.type("Hello");
+    await expect.poll(() => title(app)).toBe("● Untitled — Wysidown");
+    await chooseToSaveAs(app, path);
+    await saveUntil(app, path, "Hello");
+    await expect.poll(() => title(app)).toBe("new.md — Wysidown");
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
 test("Open replaces the document with the chosen file", async () => {
   const path = copyFixture("20-headings.md");
   const { app, window, errors } = await launch(copyFixture(name));

@@ -5,6 +5,9 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- An empty file, a file holding only blank lines, and a new untitled document can be typed
+  into. Deleting everything in a document leaves an empty line to type on, and saves an empty
+  file.
 - The Windows app opens a markdown file chosen with File > Open (Ctrl+O), named on the command
   line, or dropped on the window, and saves it with File > Save (Ctrl+S) or Save As
   (Ctrl+Shift+S). Saving writes only the characters you changed and keeps the file's line endings

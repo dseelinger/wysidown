@@ -71,6 +71,10 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
   /** Writes one new or changed node from scratch; null for nodes that only exist inside a table. */
   const rewrite = (n: Node, prefix: string, parent: Node | null, index: number): string | null => {
     if (n.type.name === "table_row" || n.type.name === "table_cell") return null;
+    if (n.type.name === "doc") {
+      const blocks = indent(writeBlocks(childNodes(n), source.style), prefix);
+      return source.doc.childCount === 0 ? blocks + text : blocks;
+    }
     if (n.type.name === "list_item" && parent) {
       const ordered = parent.attrs["ordered"] as boolean;
       const start = ordered ? ((parent.attrs["start"] as number | null) ?? 1) + index : null;

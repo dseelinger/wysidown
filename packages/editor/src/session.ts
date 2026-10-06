@@ -10,6 +10,7 @@ import {
 import { Fragment, type Node } from "prosemirror-model";
 import { EditorState, Selection, type Plugin, type Transaction } from "prosemirror-state";
 import { fromHost, keepReferencedDefinitions } from "./definitions.ts";
+import { keepATextblock, shown, written } from "./empty-document.ts";
 
 /**
  * The editor's side of the host protocol, with no view. Writes the document against the source of
@@ -31,7 +32,7 @@ export class Session {
 
   constructor(post: (message: EditorMessage) => void, plugins: readonly Plugin[] = []) {
     this.#post = post;
-    this.#plugins = [keepReferencedDefinitions, ...plugins];
+    this.#plugins = [keepReferencedDefinitions, keepATextblock, ...plugins];
     this.#state = EditorState.create({ schema, plugins: [...this.#plugins] });
   }
 
@@ -47,20 +48,22 @@ export class Session {
   /** Handles a message from the host. Returns the new state when the message changed it. */
   receive(message: HostMessage): EditorState | null {
     switch (message.type) {
-      case "load":
+      case "load": {
         this.#source = parseMarkdown(message.text);
+        const doc = shown(this.#source.doc);
         this.#state = EditorState.create({
-          doc: this.#source.doc,
-          selection: firstText(this.#source.doc),
+          doc,
+          selection: firstText(doc),
           plugins: [...this.#plugins],
         });
         this.#reset(message.text, message.version);
         return this.#state;
+      }
       case "changed": {
         if (!this.#source || message.version <= this.#version) return null;
         const source = parseMarkdown(message.text);
-        this.#state = this.#state.apply(replaceChangedBlocks(this.#state, source.doc));
-        this.#source = adopt(source, this.#state.doc);
+        this.#state = this.#state.apply(replaceChangedBlocks(this.#state, shown(source.doc)));
+        this.#source = source.doc.childCount === 0 ? source : adopt(source, this.#state.doc);
         this.#reset(message.text, message.version);
         return this.#state;
       }
@@ -90,7 +93,8 @@ export class Session {
   #flush(): void {
     if (!this.#source || this.#sent !== null) return;
     const doc = this.#state.doc;
-    if (this.#written?.doc !== doc) this.#written = { doc, text: serializeMarkdown(this.#source, doc).text };
+    if (this.#written?.doc !== doc)
+      this.#written = { doc, text: serializeMarkdown(this.#source, written(doc, this.#source)).text };
     const edit = diffText(this.#hostText, this.#written.text);
     if (!edit) return;
     this.#sent = this.#written.text;
