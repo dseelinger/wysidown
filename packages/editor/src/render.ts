@@ -79,11 +79,47 @@ class ShownWhitespaceParser extends DOMParser {
 
 export const domParser = new ShownWhitespaceParser(schema, DOMParser.fromSchema(schema).rules);
 
-/** Reads pasted content. */
-export const clipboardParser = DOMParser.fromSchema(schema);
-
-/** Writes document content to the DOM, for the clipboard. */
-export const serializer = new DOMSerializer(nodes, marks);
+/**
+ * Writes document content to the DOM, for the clipboard: standard HTML for other programs, with
+ * the attributes `clipboardParser` needs to read it back unchanged.
+ */
+export const serializer = new DOMSerializer(
+  {
+    ...nodes,
+    table: (n) => [
+      "table",
+      { "data-align": (n.attrs["align"] as (string | null)[]).map((a) => a ?? "").join(",") },
+      ["tbody", 0],
+    ],
+    raw_block: (n) => {
+      const [tag, attrs, content] = nodes["raw_block"]!(n) as [string, Record<string, string>, string];
+      return [tag, { ...attrs, "data-identifier": n.attrs["identifier"] as string | null }, content];
+    },
+    image: (n) => [
+      "img",
+      { src: str(n.attrs["src"]), alt: str(n.attrs["alt"]), title: n.attrs["title"] as string | null },
+    ],
+    raw_inline: (n) => [
+      "code",
+      { class: "raw", "data-identifier": n.attrs["identifier"] as string | null },
+      str(n.attrs["source"]),
+    ],
+  },
+  {
+    ...marks,
+    link: (m) => [
+      "a",
+      {
+        href: str(m.attrs["href"]),
+        "data-title": m.attrs["title"] as string | null,
+        "data-identifier": m.attrs["identifier"] as string | null,
+        "data-label": m.attrs["label"] as string | null,
+        "data-reference-type": m.attrs["referenceType"] as string | null,
+      },
+      0,
+    ],
+  },
+);
 
 /**
  * View constructors for every node type and mark, so the core schema needs no DOM specs. Images

@@ -5,6 +5,14 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Pasting keeps formatting as markdown. Content copied from a web page, Word or Google Docs keeps
+  its headings, bold, italic, strikethrough, links, lists (nested and numbered), task lists, code
+  and tables. Word's own formatting and empty lines are dropped. Images that are only on the
+  clipboard, not at a web address, are left out. Links that run script are pasted as plain text.
+  Text copied from a markdown file in VS Code, or plain text from any program, is read as
+  markdown, so `**bold**` pastes as bold. Several lines of code copied from VS Code become a code
+  block marked with the file's language. Ctrl+Shift+V pastes text exactly as written, saving
+  characters such as `*` so they stay text. Content copied in Wysidown pastes back unchanged.
 - Images are shown. An image path is read relative to the markdown file, and a path starting with
   `/` relative to the top of the file's git repository (or the file's folder when it is not in
   one). An image that cannot be found or read shows as a box with its alt text; hovering over the

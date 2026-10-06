@@ -7,7 +7,8 @@ import { codeKeys } from "./code.ts";
 import { noResources } from "./images.ts";
 import { links } from "./links.ts";
 import { listKeys } from "./lists.ts";
-import { clipboardParser, domParser, serializer, views } from "./render.ts";
+import { paste } from "./paste.ts";
+import { domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
 import { tableKeys, tables } from "./tables.ts";
 
@@ -41,6 +42,7 @@ export function createEditor(
     keymap(listKeys),
     keymap(baseKeymap),
     tables(),
+    paste(),
     links((href) => {
       post({ type: "open", href });
     }),
@@ -52,7 +54,6 @@ export function createEditor(
     state: session.state,
     ...views(document, () => resources),
     domParser,
-    clipboardParser,
     clipboardSerializer: serializer,
     editable: () => session.loaded,
     dispatchTransaction(tr) {
