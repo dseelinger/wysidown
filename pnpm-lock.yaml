@@ -222,6 +222,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/editor
     devDependencies:
+      '@playwright/test':
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/mocha':
         specifier: 10.0.10
         version: 10.0.10

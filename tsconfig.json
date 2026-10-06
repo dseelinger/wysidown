@@ -32,6 +32,9 @@
       "path": "apps/vscode/src/webview"
     },
     {
+      "path": "apps/vscode/e2e"
+    },
+    {
       "path": "tsconfig.tools.json"
     }
   ]
