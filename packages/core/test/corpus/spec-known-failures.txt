@@ -1,0 +1,3 @@
+# GFM spec edits the serializer gets wrong although markdown can express them.
+# One per line: <file> <edit>@<position>. The test fails if one is fixed or a new one appears.
+235-list-items.md delete#1  # deleting the list leaves "     two" indented five spaces, which then reads as code

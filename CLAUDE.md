@@ -81,10 +81,20 @@ markdown corpus.
 
 ## The fidelity rule
 
-Unedited bytes never change. The serializer copies the original source for every node the user did
-not touch and re-serializes only what changed, verifying each result by re-parsing it
-(`docs/spikes/roundtrip.md`, section 2). A change that rewrites bytes outside the edit is a bug,
-unless markdown cannot express the edit otherwise; those cases are listed in the tests.
+Unedited bytes never change. `parseMarkdown` (`packages/core/src/markdown/parse.ts`) records the
+source range of every node and, for every textblock, the source span of every character.
+`serializeMarkdown` (`serialize.ts`) relies on ProseMirror reusing unchanged node objects: a node
+that is the same object as at load is written as its original slice. Edited nodes go through steps
+that each rewrite more: splice the edit into the block's source, rewrite only the inline content,
+rewrite the block, rewrite it with its neighbours. The first output that parses back to the
+document wins (`verify.ts`, which re-parses only the changed top-level region when that is
+equivalent). Text in the document model always uses "\n"; the file's line endings and byte order
+mark are restored on save.
+
+A change that rewrites bytes outside the edit is a bug unless it is listed:
+`an-edit-changes-only-its-own-bytes.test.ts` names the realistic-corpus edits that are wider by
+design, and `packages/core/test/corpus/spec-known-failures.txt` names the GFM spec edits the
+serializer gets wrong. Both lists fail the test when an entry stops applying.
 
 Fixtures in `packages/core/test/corpus/` are compared byte for byte. `.gitattributes` stores them
 with no line-ending conversion, and `the-corpus-keeps-its-bytes.test.ts` fails if a checkout gave
