@@ -2,11 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'"
+    />
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="editor.css" />
     <title>Wysidown</title>
   </head>
   <body>
-    <p>Wysidown</p>
+    <div id="editor"></div>
+    <script src="renderer.js"></script>
   </body>
 </html>

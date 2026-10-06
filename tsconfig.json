@@ -1,13 +1,35 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/core" },
-    { "path": "packages/core/test" },
-    { "path": "packages/editor" },
-    { "path": "packages/editor/test" },
-    { "path": "packages/editor/e2e" },
-    { "path": "apps/desktop" },
-    { "path": "apps/vscode" },
-    { "path": "tsconfig.tools.json" }
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/core/test"
+    },
+    {
+      "path": "packages/editor"
+    },
+    {
+      "path": "packages/editor/test"
+    },
+    {
+      "path": "packages/editor/e2e"
+    },
+    {
+      "path": "apps/desktop"
+    },
+    {
+      "path": "apps/desktop/src/renderer"
+    },
+    {
+      "path": "apps/desktop/e2e"
+    },
+    {
+      "path": "apps/vscode"
+    },
+    {
+      "path": "tsconfig.tools.json"
+    }
   ]
 }

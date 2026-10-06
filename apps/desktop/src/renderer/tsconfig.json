@@ -1,0 +1,11 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "rootDir": ".",
+    "outDir": "../../dist-types/renderer"
+  },
+  "include": ["."],
+  "references": [{ "path": "../../../../packages/core" }, { "path": "../../../../packages/editor" }]
+}

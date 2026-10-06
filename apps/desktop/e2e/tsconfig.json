@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "rootDir": "..",
+    "outDir": "../dist-types/e2e"
+  },
+  "include": [".", "../playwright.config.ts"],
+  "references": [{ "path": "../../../packages/core" }]
+}
