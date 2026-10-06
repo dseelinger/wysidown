@@ -4,6 +4,7 @@
     { "path": "packages/core" },
     { "path": "packages/core/test" },
     { "path": "packages/editor" },
+    { "path": "packages/editor/test" },
     { "path": "packages/editor/e2e" },
     { "path": "apps/desktop" },
     { "path": "apps/vscode" },

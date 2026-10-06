@@ -6,5 +6,5 @@
     "rootDir": "..",
     "outDir": "../dist-types/e2e"
   },
-  "include": [".", "../playwright.config.ts", "../vite.config.ts"]
+  "include": [".", "../harness/api.ts", "../playwright.config.ts", "../vite.config.ts"]
 }

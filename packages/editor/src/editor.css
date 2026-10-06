@@ -1,0 +1,37 @@
+@import "prosemirror-view/style/prosemirror.css";
+
+.ProseMirror {
+  outline: none;
+  line-height: 1.5;
+}
+
+.ProseMirror .raw {
+  opacity: 0.7;
+}
+
+.ProseMirror li.task {
+  list-style: none;
+}
+
+.ProseMirror li.task::before {
+  content: "☐";
+  position: absolute;
+  left: -1.4em;
+}
+
+.ProseMirror li.task[data-checked="true"]::before {
+  content: "☑";
+}
+
+.ProseMirror .image::before {
+  content: "🖼 ";
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+}
+
+.ProseMirror td {
+  border: 1px solid currentcolor;
+  padding: 0.2em 0.5em;
+}
