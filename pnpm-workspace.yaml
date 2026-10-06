@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+  - apps/*
+
+engineStrict: true
+savePrefix: ""
+
+allowBuilds:
+  esbuild: true
+  "@vscode/vsce-sign": false
+  electron-winstaller: false

@@ -1,0 +1,9 @@
+appId: com.dseelinger.wysidown
+productName: Wysidown
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+win:
+  target: dir

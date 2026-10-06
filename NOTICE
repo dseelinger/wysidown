@@ -1,0 +1,11 @@
+wysidown
+Copyright (c) 2026 Doug Seelinger. Licensed under the MIT License (see LICENSE).
+
+Third-party material
+
+packages/core/test/corpus/spec/
+  Each file is one example from the GitHub Flavored Markdown Spec, version 0.29
+  (2019-04-06), https://github.github.com/gfm/, by GitHub, Inc. and John MacFarlane.
+  Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License,
+  http://creativecommons.org/licenses/by-sa/4.0/. The examples were extracted unchanged
+  except that the spec's tab marker (→) was replaced by a tab character.

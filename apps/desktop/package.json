@@ -1,0 +1,25 @@
+{
+  "name": "@wysidown/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wysidown: a WYSIWYG GitHub Flavored Markdown editor.",
+  "author": "Doug Seelinger",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "e2e": "playwright test",
+    "package": "electron-builder --dir --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@wysidown/core": "workspace:*",
+    "@wysidown/editor": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2"
+  }
+}

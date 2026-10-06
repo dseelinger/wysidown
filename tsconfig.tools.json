@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist-types/tools"
+  },
+  "include": ["vitest.config.ts", "vitest.setup.ts", "packages/*/vitest.config.ts"]
+}

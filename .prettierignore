@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+packages/core/test/corpus/
+**/dist/
+**/dist-test/
+**/dist-types/
+**/release/
+**/.vscode-test/
+**/test-results/
+**/playwright-report/

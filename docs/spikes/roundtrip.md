@@ -8,8 +8,9 @@ edit keeps its exact bytes? Candidates: Tiptap 3.31.4 (`@tiptap/markdown`), Milk
 Recommendation: **ProseMirror + mdast, with a source-preserving serializer written in core.** Do
 not use Tiptap or Milkdown.
 
-Code: `spikes/roundtrip/` (throwaway). Re-run with `npx tsx src/measure.ts mdast tiptap milkdown`,
-`npx tsx src/proto/run.ts` and `npx vitest run`.
+Code: `spikes/roundtrip/` in commit `ebc1097` (removed afterwards; the corpus moved to
+`packages/core/test/corpus/`). In that commit, re-run with
+`npx tsx src/measure.ts mdast tiptap milkdown`, `npx tsx src/proto/run.ts` and `npx vitest run`.
 
 ## Corpus
 
@@ -27,17 +28,17 @@ Code: `spikes/roundtrip/` (throwaway). Re-run with `npx tsx src/measure.ts mdast
 "Same HTML" means the output renders to the same HTML as the input under micromark with GFM. It
 measures whether meaning survived, as opposed to bytes.
 
-| Candidate | Set | Files | Byte-identical | Same HTML | Errors logged |
-| --- | --- | --: | --: | --: | --: |
-| mdast (`mdast-util-to-markdown`) | realistic, LF | 32 | 3 | 30 | 0 |
-| | realistic, CRLF | 32 | 0 | 30 | 0 |
-| | spec | 672 | 202 | 670 | 0 |
-| Tiptap | realistic, LF | 32 | 0 | 18 | 0 |
-| | realistic, CRLF | 32 | 0 | 18 | 0 |
-| | spec | 672 | 1 | 464 | 0 |
-| Milkdown | realistic, LF | 32 | 3 | 27 | 1 |
-| | realistic, CRLF | 32 | 0 | 27 | 1 |
-| | spec | 672 | 167 | 613 | 10 |
+| Candidate                        | Set             | Files | Byte-identical | Same HTML | Errors logged |
+| -------------------------------- | --------------- | ----: | -------------: | --------: | ------------: |
+| mdast (`mdast-util-to-markdown`) | realistic, LF   |    32 |              3 |        30 |             0 |
+|                                  | realistic, CRLF |    32 |              0 |        30 |             0 |
+|                                  | spec            |   672 |            202 |       670 |             0 |
+| Tiptap                           | realistic, LF   |    32 |              0 |        18 |             0 |
+|                                  | realistic, CRLF |    32 |              0 |        18 |             0 |
+|                                  | spec            |   672 |              1 |       464 |             0 |
+| Milkdown                         | realistic, LF   |    32 |              3 |        27 |             1 |
+|                                  | realistic, CRLF |    32 |              0 |        27 |             1 |
+|                                  | spec            |   672 |            167 |       613 |            10 |
 
 None of them is byte-identical on real documents. Every canonical serializer rewrites `*` and
 `+` bullets as one marker, `_x_` as `*x*`, setext headings as ATX, `1.` `1.` `1.` as `1.` `2.` `3.`,
@@ -90,15 +91,16 @@ step that verifies is used. Toggling a task checkbox rewrites only the `[ ]` or 
 
 Each edit kind is applied in turn to every eligible block of every file (one edit per run):
 
-| Set | Identity | Replace a word | Type `a*b_[c]` + backtick + `d` | Bold a word | Insert paragraph | Delete block | Toggle task |
-| --- | --: | --: | --: | --: | --: | --: | --: |
-| realistic, LF | 32/32 | 315/316 | 316/316 | 210/210 | 252/252 | 233/252 | 11/11 |
-| realistic, CRLF | 32/32 | 315/316 | 316/316 | 210/210 | 252/252 | 233/252 | 11/11 |
-| realistic, BOM | 32/32 | 315/316 | 316/316 | 210/210 | 252/252 | 233/252 | 11/11 |
-| realistic, no final newline | 32/32 | 315/316 | 316/316 | 210/210 | 252/252 | 233/252 | 11/11 |
-| spec | 671/672 | 581/643 | 641/643 | 584/586 | 906/919 | 359/434 | 6/6 |
+| Set                         | Identity | Replace a word | Type `a*b_[c]` + backtick + `d` | Bold a word | Insert paragraph | Delete block | Toggle task |
+| --------------------------- | -------: | -------------: | ------------------------------: | ----------: | ---------------: | -----------: | ----------: |
+| realistic, LF               |    32/32 |        315/316 |                         316/316 |     210/210 |          252/252 |      233/252 |       11/11 |
+| realistic, CRLF             |    32/32 |        315/316 |                         316/316 |     210/210 |          252/252 |      233/252 |       11/11 |
+| realistic, BOM              |    32/32 |        315/316 |                         316/316 |     210/210 |          252/252 |      233/252 |       11/11 |
+| realistic, no final newline |    32/32 |        315/316 |                         316/316 |     210/210 |          252/252 |      233/252 |       11/11 |
+| spec                        |  671/672 |        581/643 |                         641/643 |     584/586 |          906/919 |      359/434 |         6/6 |
 
 Pass criteria:
+
 - Identity: output equals input. Containers are walked rather than copied whole, so the gap
   logic is exercised.
 - Replace a word: exactly the word's bytes change.
@@ -125,9 +127,9 @@ reads as code.
 Measured on the prototype with no optimisation:
 
 | Document | Parse | Serialize + verify one edit |
-| --- | --: | --: |
-| 36 KB | 88 ms | 77 ms |
-| 361 KB | 1.1 s | 1.1 s |
+| -------- | ----: | --------------------------: |
+| 36 KB    | 88 ms |                       77 ms |
+| 361 KB   | 1.1 s |                       1.1 s |
 
 Verification re-parses the whole document, which is too slow to run on every keystroke above
 about 30 KB. Core must verify only the changed top-level blocks, which is possible because those
@@ -135,14 +137,14 @@ blocks are known.
 
 ## 3. Comparison
 
-| Criterion | Tiptap | Milkdown | ProseMirror + mdast |
-| --- | --- | --- | --- |
-| Byte fidelity reachable | No source offsets in `marked` tokens; would need a new parser | Offsets exist in mdast but runners drop them; both transformer directions would need replacing | Demonstrated above |
-| Headless (Node, no DOM) | Yes (`MarkdownManager`) | No: the editor needs `document` | Yes |
-| Content preserved by its own pipeline | No: HTML, references, footnotes, entities | No: drops an untitled image paragraph | Yes, with opaque nodes for the rest |
-| GFM coverage | Tables, tasks, strike; no footnotes | Full GFM via remark | Full GFM plus front matter and math via micromark extensions |
-| What we would own | Parser and serializer, fighting its extension model | Parser and serializer, inside its ctx/timer plugin system | Schema, parser, serializer, commands, input rules, keymaps |
-| Licence | MIT core; Pro extensions paid | MIT | MIT |
+| Criterion                             | Tiptap                                                        | Milkdown                                                                                       | ProseMirror + mdast                                          |
+| ------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Byte fidelity reachable               | No source offsets in `marked` tokens; would need a new parser | Offsets exist in mdast but runners drop them; both transformer directions would need replacing | Demonstrated above                                           |
+| Headless (Node, no DOM)               | Yes (`MarkdownManager`)                                       | No: the editor needs `document`                                                                | Yes                                                          |
+| Content preserved by its own pipeline | No: HTML, references, footnotes, entities                     | No: drops an untitled image paragraph                                                          | Yes, with opaque nodes for the rest                          |
+| GFM coverage                          | Tables, tasks, strike; no footnotes                           | Full GFM via remark                                                                            | Full GFM plus front matter and math via micromark extensions |
+| What we would own                     | Parser and serializer, fighting its extension model           | Parser and serializer, inside its ctx/timer plugin system                                      | Schema, parser, serializer, commands, input rules, keymaps   |
+| Licence                               | MIT core; Pro extensions paid                                 | MIT                                                                                            | MIT                                                          |
 
 Fidelity requires owning both directions of the markdown transform. That removes most of what
 Tiptap and Milkdown offer. What they would still add, UI plumbing and extension registration, is
@@ -165,7 +167,6 @@ smaller than what we would have to work around.
 - **Corpus pass bar:** the realistic corpus passes every test in
   `src/proto/fidelity.test.ts` (897 tests). The spec set's known failures are listed per
   example, as the plan describes.
-- **Toolchain notes for issue 2:** the current TypeScript is 7.0.2, the native port. The layering
-  test planned on the TypeScript compiler API must be checked against TS 7's API or use
-  `oxc-parser` or `@typescript-eslint/typescript-estree` instead. pnpm is not installed on this
-  machine; the spike used npm.
+- **Toolchain:** the spike used npm. The skeleton pins TypeScript 6.0.3 rather than 7.0.2 (the
+  native port), because typescript-eslint supports `<6.1` and the layering test uses the
+  compiler API.

@@ -1,4 +1,4 @@
 * text=auto eol=lf
 
 # Fixtures are compared byte for byte: no line-ending conversion.
-spikes/roundtrip/corpus/** -text
+packages/core/test/corpus/** -text

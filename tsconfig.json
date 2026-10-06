@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/core/test" },
+    { "path": "packages/editor" },
+    { "path": "packages/editor/e2e" },
+    { "path": "apps/desktop" },
+    { "path": "apps/vscode" },
+    { "path": "tsconfig.tools.json" }
+  ]
+}
