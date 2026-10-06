@@ -36,7 +36,7 @@ export const test = base.extend<{ open: (fixture: string) => Promise<Opened> }>(
       return result;
     });
     const errors: string[] = [];
-    for (const o of opened) errors.push(...o.errors, ...(await uncaught(o.editor)));
+    for (const o of opened) errors.push(...o.errors, ...(o.editor.isDetached() ? [] : await uncaught(o.editor)));
     for (const app of apps) await app.close();
     expect(errors).toEqual([]);
   },
@@ -95,6 +95,7 @@ async function open(name: string, apps: ElectronApplication[]): Promise<Opened> 
         "security.workspace.trust.enabled": false,
         "update.mode": "none",
         "telemetry.telemetryLevel": "off",
+        "window.dialogStyle": "custom",
       }),
     );
     const app = await electron.launch({
@@ -124,18 +125,35 @@ async function open(name: string, apps: ElectronApplication[]): Promise<Opened> 
     });
     const editor = await editorFrame(window);
     if (editor) {
-      await editor.evaluate(() => {
-        const errors: string[] = [];
-        Object.assign(globalThis, { wysidownErrors: errors });
-        globalThis.addEventListener("error", (e) => errors.push(e.message));
-        globalThis.addEventListener("unhandledrejection", (e) => errors.push(String(e.reason)));
-      });
+      await recordErrors(editor);
       return { window, editor, path, errors };
     }
     base.info().annotations.push({ type: "relaunched", description: `${name} opened in the text editor` });
     if (attempt === 3) throw new Error(`${name} opened in the text editor ${String(attempt)} times, not in Wysidown`);
     await app.close();
   }
+}
+
+/** Records errors thrown in the editor's frame for `uncaught`. */
+async function recordErrors(editor: Frame): Promise<void> {
+  await editor.evaluate(() => {
+    const errors: string[] = [];
+    Object.assign(globalThis, { wysidownErrors: errors });
+    globalThis.addEventListener("error", (e) => errors.push(e.message));
+    globalThis.addEventListener("unhandledrejection", (e) => errors.push(String(e.reason)));
+  });
+}
+
+/**
+ * Waits for the editor to show a document in a new webview, after its old one was destroyed by
+ * hiding or closing the tab, and makes it `o.editor`.
+ */
+export async function shownAgain(o: Opened): Promise<void> {
+  await expect.poll(() => o.editor.isDetached()).toBe(true);
+  const editor = await editorFrame(o.window);
+  if (!editor) throw new Error("the editor did not show the document again");
+  await recordErrors(editor);
+  o.editor = editor;
 }
 
 /** True for a console message from VS Code itself: its installed code, or the page that hosts each webview. */
@@ -148,19 +166,25 @@ async function uncaught(editor: Frame): Promise<string[]> {
   return editor.evaluate(() => (globalThis as unknown as { wysidownErrors: string[] }).wysidownErrors);
 }
 
+/** The frames holding an editor that shows a document. */
+export async function editorFrames(window: Page): Promise<Frame[]> {
+  const frames: Frame[] = [];
+  for (const frame of window.frames()) {
+    const count = await frame
+      .locator(".ProseMirror[contenteditable=true]")
+      .count()
+      .catch(() => 0);
+    if (count > 0) frames.push(frame);
+  }
+  return frames;
+}
+
 /** The frame holding the editor, once it shows a document; null if none appears within 15 seconds. */
 async function editorFrame(window: Page): Promise<Frame | null> {
   const end = Date.now() + 15000;
   while (Date.now() < end) {
-    for (const frame of window.frames()) {
-      if (
-        (await frame
-          .locator(".ProseMirror[contenteditable=true]")
-          .count()
-          .catch(() => 0)) > 0
-      )
-        return frame;
-    }
+    const [frame] = await editorFrames(window);
+    if (frame) return frame;
     await window.waitForTimeout(250);
   }
   return null;

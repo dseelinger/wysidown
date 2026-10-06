@@ -8,6 +8,8 @@ export class HostDocument {
   #text = "";
   #saved = "";
   #version = 1;
+  /** The version of the latest `load` or `changed` sent. */
+  #told = 1;
   /** The pending `flush` calls, oldest first. */
   #flushes: { id: number; resolve: () => void }[] = [];
   #lastFlush = 0;
@@ -34,6 +36,7 @@ export class HostDocument {
   /** Handles a message from the editor. `message` is untrusted: anything malformed is ignored. */
   receive(message: unknown): void {
     if (isReady(message)) {
+      this.#told = this.#version;
       this.#send({ type: "load", text: this.#text, version: this.#version });
       return;
     }
@@ -43,15 +46,13 @@ export class HostDocument {
       for (const f of answered) f.resolve();
       return;
     }
-    if (!isEdit(message)) return;
-    if (message.baseVersion !== this.#version) {
-      this.#send({ type: "changed", text: this.#text, version: this.#version });
-      return;
-    }
+    if (!isEdit(message) || message.seenVersion < this.#told) return;
     let text: string;
     try {
+      if (message.baseVersion !== this.#version) throw new Error("the edit is not based on the current version");
       text = applyEdits(this.#text, message.edits);
     } catch {
+      this.#told = ++this.#version;
       this.#send({ type: "changed", text: this.#text, version: this.#version });
       return;
     }
@@ -86,7 +87,7 @@ export class HostDocument {
     this.#path = path;
     this.#text = text;
     this.#saved = text;
-    this.#version++;
+    this.#told = ++this.#version;
     this.#send({ type: "load", text, version: this.#version });
     this.#onDirtyChange();
   }
@@ -111,8 +112,14 @@ function isFlushed(message: unknown): message is Extract<EditorMessage, { type: 
 
 function isEdit(message: unknown): message is Extract<EditorMessage, { type: "edit" }> {
   if (typeof message !== "object" || message === null) return false;
-  const m = message as { type?: unknown; baseVersion?: unknown; edits?: unknown };
-  return m.type === "edit" && Number.isInteger(m.baseVersion) && Array.isArray(m.edits) && m.edits.every(isTextEdit);
+  const m = message as { type?: unknown; baseVersion?: unknown; seenVersion?: unknown; edits?: unknown };
+  return (
+    m.type === "edit" &&
+    Number.isInteger(m.baseVersion) &&
+    Number.isInteger(m.seenVersion) &&
+    Array.isArray(m.edits) &&
+    m.edits.every(isTextEdit)
+  );
 }
 
 function isTextEdit(edit: unknown): edit is TextEdit {

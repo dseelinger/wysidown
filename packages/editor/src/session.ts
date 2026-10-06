@@ -14,8 +14,8 @@ import { keepATextblock, shown, written } from "./empty-document.ts";
 
 /**
  * The editor's side of the host protocol, with no view. Writes the document against the source of
- * the host's text and sends the difference as an edit. At most one edit is in flight; changes made
- * meanwhile are sent when the host accepts it.
+ * the host's text and sends each change as an edit straight away, computed against the text the
+ * edits already in flight produce, so that no change waits in the editor.
  */
 export class Session {
   readonly #post: (message: EditorMessage) => void;
@@ -23,11 +23,12 @@ export class Session {
   #state: EditorState;
   /** The source the serializer writes against; its nodes are the unedited nodes of the document. */
   #source: MarkdownSource | null = null;
+  /** The latest version received from the host. */
   #version = 0;
   /** The host's text at `#version`. */
   #hostText = "";
-  /** The text the in-flight edit produces; null when no edit is in flight. */
-  #sent: string | null = null;
+  /** The text each edit in flight produces, oldest first. The host's version after the k-th is `#version + k + 1`. */
+  #sent: string[] = [];
   #written: { doc: Node; text: string } | null = null;
   /** The id of the latest `flush` not yet answered; null when none is waiting. */
   #flushAsked: number | null = null;
@@ -69,13 +70,14 @@ export class Session {
         this.#reset(message.text, message.version);
         return this.#state;
       }
-      case "accepted":
-        if (this.#sent === null) return null;
-        this.#hostText = this.#sent;
+      case "accepted": {
+        const text = this.#sent.shift();
+        if (text === undefined) return null;
+        this.#hostText = text;
         this.#version = message.version;
-        this.#sent = null;
-        this.#flush();
+        this.#answerFlush();
         return null;
+      }
       case "flush":
         this.#flushAsked = message.id;
         this.#flush();
@@ -92,28 +94,29 @@ export class Session {
   #reset(text: string, version: number): void {
     this.#hostText = text;
     this.#version = version;
-    this.#sent = null;
+    this.#sent = [];
     this.#written = null;
     this.#answerFlush();
   }
 
-  /** Sends the document's changes as an edit unless one is in flight; answers a pending `flush` once none is. */
+  /** Sends the document's changes as an edit; answers a pending `flush` once no edit is in flight. */
   #flush(): void {
-    if (this.#source && this.#sent === null) {
+    if (this.#source) {
       const doc = this.#state.doc;
       if (this.#written?.doc !== doc)
         this.#written = { doc, text: serializeMarkdown(this.#source, written(doc, this.#source)).text };
-      const edit = diffText(this.#hostText, this.#written.text);
+      const edit = diffText(this.#sent.at(-1) ?? this.#hostText, this.#written.text);
       if (edit) {
-        this.#sent = this.#written.text;
-        this.#post({ type: "edit", baseVersion: this.#version, edits: [edit] });
+        const baseVersion = this.#version + this.#sent.length;
+        this.#sent.push(this.#written.text);
+        this.#post({ type: "edit", baseVersion, seenVersion: this.#version, edits: [edit] });
       }
     }
     this.#answerFlush();
   }
 
   #answerFlush(): void {
-    if (this.#flushAsked === null || this.#sent !== null) return;
+    if (this.#flushAsked === null || this.#sent.length > 0) return;
     this.#post({ type: "flushed", id: this.#flushAsked });
     this.#flushAsked = null;
   }

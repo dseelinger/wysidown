@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- In VS Code, the last characters typed are no longer lost when the Wysidown tab is hidden or
+  closed straight afterwards. Switching to another tab, or closing one of two Wysidown tabs showing
+  the same file, could drop everything typed after the first character of a quick burst, and
+  saving afterwards could not bring it back.
 - Saving straight after typing saves everything typed. In VS Code, Ctrl+S pressed a moment after
   the last keystroke could save the file without the last few characters and leave it marked as
   changed; the Windows app could do the same, and could close without asking about changes typed

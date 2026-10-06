@@ -2,12 +2,12 @@ import { describe, expect, test } from "vitest";
 import { Wire } from "./support/wire.ts";
 
 describe("a flush is answered once every change has reached the host", () => {
-  test("typing while an edit is in flight reaches the host before the answer", async () => {
+  test("typing while edits are in flight reaches the host before the answer", async () => {
     const wire = new Wire("One.\n");
     wire.edit((s) => s.tr.insertText("a", 4));
     wire.edit((s) => s.tr.insertText("b", 5));
     wire.edit((s) => s.tr.insertText("c", 6));
-    expect(wire.edits).toHaveLength(1);
+    expect(wire.edits).toHaveLength(3);
     const flushed = wire.host.flush();
     wire.drain();
     expect(await flushed).toBe("Oneabc.\n");

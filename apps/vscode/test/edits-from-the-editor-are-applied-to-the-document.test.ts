@@ -21,28 +21,70 @@ suite("edits from the editor are applied to the document", () => {
     await vscode.commands.executeCommand("workbench.action.closeAllEditors");
   });
 
-  test("a ready editor is sent the document's text and version", async () => {
+  test("a ready editor is sent the document's text", async () => {
     const document = await open(blog);
     const { connection, sent } = connect(document);
     await connection.receive({ type: "ready" });
-    assert.deepEqual(sent, [{ type: "load", text: blog, version: document.version }]);
+    assert.deepEqual(sent, [{ type: "load", text: blog, version: 1 }]);
     connection.dispose();
   });
 
-  test("an edit is applied to the document and accepted at the document's new version", async () => {
+  test("an edit is applied to the document and accepted at the next version", async () => {
     const document = await open(blog);
     const { connection, sent } = connect(document);
     await connection.receive({ type: "ready" });
-    const before = document.version;
     await connection.receive({
       type: "edit",
-      baseVersion: before,
+      baseVersion: 1,
+      seenVersion: 1,
       edits: [{ start: at, end: at, insert: " Really." }],
     });
     assert.equal(document.getText(), blog.slice(0, at) + " Really." + blog.slice(at));
-    assert.ok(document.version > before);
     assert.ok(document.isDirty);
-    assert.deepEqual(sent.slice(1), [{ type: "accepted", version: document.version }]);
+    assert.deepEqual(sent.slice(1), [{ type: "accepted", version: 2 }]);
+    connection.dispose();
+  });
+
+  test("edits sent before the first is accepted are applied in turn", async () => {
+    const document = await open(blog);
+    const { connection, sent } = connect(document);
+    await connection.receive({ type: "ready" });
+    void connection.receive({
+      type: "edit",
+      baseVersion: 1,
+      seenVersion: 1,
+      edits: [{ start: at, end: at, insert: " Really" }],
+    });
+    await connection.receive({
+      type: "edit",
+      baseVersion: 2,
+      seenVersion: 1,
+      edits: [{ start: at + 7, end: at + 7, insert: "." }],
+    });
+    assert.equal(document.getText(), blog.slice(0, at) + " Really." + blog.slice(at));
+    assert.deepEqual(sent.slice(1), [
+      { type: "accepted", version: 2 },
+      { type: "accepted", version: 3 },
+    ]);
+    connection.dispose();
+  });
+
+  test("an edit made before a change reached the editor is ignored", async () => {
+    const document = await open(blog);
+    const { connection, sent } = connect(document);
+    await connection.receive({ type: "ready" });
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(document.uri, new vscode.Position(0, 0), "Hello\n\n");
+    assert.ok(await vscode.workspace.applyEdit(edit));
+    await until(() => sent.length === 2);
+    await connection.receive({
+      type: "edit",
+      baseVersion: 2,
+      seenVersion: 1,
+      edits: [{ start: 0, end: 0, insert: "x" }],
+    });
+    assert.equal(document.getText(), "Hello\n\n" + blog);
+    assert.equal(sent.length, 2);
     connection.dispose();
   });
 
@@ -52,9 +94,11 @@ suite("edits from the editor are applied to the document", () => {
     assert.equal(document.getText(), crlf);
     const offset = crlf.indexOf(paragraphEnd) + paragraphEnd.length;
     const { connection } = connect(document);
+    await connection.receive({ type: "ready" });
     await connection.receive({
       type: "edit",
-      baseVersion: document.version,
+      baseVersion: 1,
+      seenVersion: 1,
       edits: [{ start: offset, end: offset, insert: " Really." }],
     });
     assert.ok(await document.save());
@@ -63,29 +107,33 @@ suite("edits from the editor are applied to the document", () => {
     connection.dispose();
   });
 
-  test("an edit made against an older version is discarded and the editor is sent the current text", async () => {
+  test("an edit against a version the host is not at is discarded and the editor is sent the current text", async () => {
     const document = await open(blog);
     const { connection, sent } = connect(document);
+    await connection.receive({ type: "ready" });
     await connection.receive({
       type: "edit",
-      baseVersion: document.version - 1,
+      baseVersion: 2,
+      seenVersion: 1,
       edits: [{ start: at, end: at, insert: " Really." }],
     });
     assert.equal(document.getText(), blog);
-    assert.deepEqual(sent, [{ type: "changed", text: blog, version: document.version }]);
+    assert.deepEqual(sent.slice(1), [{ type: "changed", text: blog, version: 2 }]);
     connection.dispose();
   });
 
   test("an edit outside the text is discarded and the editor is sent the current text", async () => {
     const document = await open(blog);
     const { connection, sent } = connect(document);
+    await connection.receive({ type: "ready" });
     await connection.receive({
       type: "edit",
-      baseVersion: document.version,
+      baseVersion: 1,
+      seenVersion: 1,
       edits: [{ start: blog.length + 1, end: blog.length + 2, insert: "x" }],
     });
     assert.equal(document.getText(), blog);
-    assert.deepEqual(sent, [{ type: "changed", text: blog, version: document.version }]);
+    assert.deepEqual(sent.slice(1), [{ type: "changed", text: blog, version: 2 }]);
     connection.dispose();
   });
 
@@ -94,7 +142,8 @@ suite("edits from the editor are applied to the document", () => {
     const { connection, sent } = connect(document);
     await connection.receive({
       type: "edit",
-      baseVersion: document.version,
+      baseVersion: 0,
+      seenVersion: 0,
       edits: [{ start: "0", end: 0, insert: "x" }],
     });
     await connection.receive("ready");
@@ -112,7 +161,7 @@ suite("edits from the editor are applied to the document", () => {
     edit.insert(document.uri, new vscode.Position(0, 0), "Hello\n\n");
     assert.ok(await vscode.workspace.applyEdit(edit));
     await until(() => sent.length === 2);
-    assert.deepEqual(sent[1], { type: "changed", text: "Hello\n\n" + blog, version: document.version });
+    assert.deepEqual(sent[1], { type: "changed", text: "Hello\n\n" + blog, version: 2 });
     connection.dispose();
   });
 
@@ -123,14 +172,15 @@ suite("edits from the editor are applied to the document", () => {
     await connection.receive({ type: "ready" });
     await connection.receive({
       type: "edit",
-      baseVersion: document.version,
+      baseVersion: 1,
+      seenVersion: 1,
       edits: [{ start: at, end: at, insert: " Really." }],
     });
     await vscode.commands.executeCommand("undo");
     await until(() => sent.length === 3);
     assert.equal(document.getText(), blog);
     assert.equal(document.isDirty, false);
-    assert.deepEqual(sent[2], { type: "changed", text: blog, version: document.version });
+    assert.deepEqual(sent[2], { type: "changed", text: blog, version: 3 });
     connection.dispose();
   });
 });

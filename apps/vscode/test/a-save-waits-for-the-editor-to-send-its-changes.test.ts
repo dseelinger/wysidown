@@ -20,7 +20,8 @@ suite("a save waits for the editor to send its changes", () => {
     assert.deepEqual(sent.at(-1), { type: "flush", id: 1 });
     void connection.receive({
       type: "edit",
-      baseVersion: document.version,
+      baseVersion: 1,
+      seenVersion: 1,
       edits: [{ start: at, end: at, insert: " Really." }],
     });
     void connection.receive({ type: "flushed", id: 1 });
@@ -44,6 +45,28 @@ suite("a save waits for the editor to send its changes", () => {
     await second;
     assert.deepEqual(done, [1, 2]);
     connection.dispose();
+  });
+
+  test("idle resolves once the edits received so far are applied", async () => {
+    const document = await vscode.workspace.openTextDocument(tempFile("blog.md", blog));
+    const { connection } = connect(document);
+    await connection.receive({ type: "ready" });
+    void connection.receive({
+      type: "edit",
+      baseVersion: 1,
+      seenVersion: 1,
+      edits: [{ start: at, end: at, insert: " Really" }],
+    });
+    void connection.receive({
+      type: "edit",
+      baseVersion: 2,
+      seenVersion: 1,
+      edits: [{ start: at + 7, end: at + 7, insert: "." }],
+    });
+    await connection.idle();
+    assert.equal(document.getText(), blog.slice(0, at) + " Really." + blog.slice(at));
+    connection.dispose();
+    await document.save();
   });
 
   test("a flush the editor does not answer resolves after its time limit", async () => {
