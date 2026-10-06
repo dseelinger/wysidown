@@ -62,4 +62,59 @@
 .ProseMirror td {
   border: 1px solid currentcolor;
   padding: 0.2em 0.5em;
+  min-width: 2em;
+}
+
+.ProseMirror td.header {
+  font-weight: 600;
+  background: color-mix(in srgb, currentcolor 6%, transparent);
+}
+
+.table-menu {
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 12em;
+  padding: 0.25em 0;
+  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border-radius: 4px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 20%, transparent);
+  font:
+    0.9em system-ui,
+    sans-serif;
+}
+
+.table-menu[hidden] {
+  display: none;
+}
+
+.table-menu button {
+  padding: 0.3em 1em;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-menu button:hover:enabled,
+.table-menu button:focus-visible {
+  background: color-mix(in srgb, CanvasText 10%, transparent);
+  outline: none;
+}
+
+.table-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.table-menu hr {
+  width: 100%;
+  margin: 0.25em 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
 }

@@ -1,9 +1,9 @@
 import { byteOrderMark } from "../text/byte-order-mark.ts";
 import type { Mark, Node } from "prosemirror-model";
 import { schema } from "./schema.ts";
-import type { MarkdownSource } from "./source.ts";
+import type { CharMap, MarkdownSource } from "./source.ts";
 import { verify } from "./verify.ts";
-import { writeBlocks } from "./write.ts";
+import { writeBlocks, writeCell } from "./write.ts";
 
 /** How much was rewritten to produce a verified result, from least to most. */
 export type Step = "minimal" | "inline" | "block" | "neighbours";
@@ -156,6 +156,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
       );
     }
     if (edited.isLeaf) return original.eq(edited) ? slice(original) : null;
+    if (original.type.name === "table") return emitTable(original, edited, prefix);
     let head: ((gap: string) => string) | null = null;
     if (!sameAttrs(original, edited)) {
       const toggled =
@@ -310,11 +311,235 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
   /** Rewrites a textblock's inline content, keeping its own syntax (heading marker, cell pipes) from the source. */
   const rewriteInline = (original: Node, edited: Node, prefix: string): string | null => {
     const map = source.chars.get(original);
+    if (edited.type.name === "table_cell") return rewriteCell(original, edited, map);
     if (!map || map.contentStart < 0 || map.contentEnd < 0) return null;
-    let inline = writeBlocks([schema.nodes.paragraph.create(null, edited.content)], source.style);
-    if (edited.type.name === "table_cell") inline = inline.replace(/(^|[^\\])\|/g, "$1\\|");
+    const inline = writeBlocks([schema.nodes.paragraph.create(null, edited.content)], source.style);
     const r = range(original);
     return text.slice(r.start, map.contentStart) + indent(inline, prefix) + text.slice(map.contentEnd, r.end);
+  };
+
+  /** Rewrites a cell's content between its pipes and padding; an empty cell gets one space each side. */
+  const rewriteCell = (original: Node, edited: Node, map: CharMap | undefined): string => {
+    const cell = slice(original);
+    const content = writeCell(edited, source.style);
+    if (map && map.contentStart >= 0 && map.contentEnd >= 0) {
+      const r = range(original);
+      return cell.slice(0, map.contentStart - r.start) + content + cell.slice(map.contentEnd - r.start);
+    }
+    const [, pipe, space, rest] = /^(\|?)([ \t]*)([^]*)$/.exec(cell)!;
+    if (content === "") return cell;
+    return pipe! + " " + content + (space!.length > 1 ? space!.slice(1) : " ") + rest!;
+  };
+
+  /** One line of a table: its cells' text between the pipes, and whether it has outer pipes. */
+  interface Line {
+    head: string;
+    lead: boolean;
+    inners: string[];
+    trail: boolean;
+    tail: string;
+  }
+
+  /**
+   * Writes `line` with new `inners`, where `map` gives the index each came from among the line's
+   * `count` cells. An empty cell at either end gets an outer pipe, without which it would not be a
+   * cell, and the one cell left of several keeps the pipe it had beside it, without which the line
+   * would not be a table row. A cell that moves to or from an end with no outer pipe loses or gains
+   * the space beside that pipe.
+   */
+  const joinLine = (
+    line: Line,
+    inners: readonly string[],
+    map: readonly (number | null)[],
+    count: number,
+    spaced: boolean,
+  ): string => {
+    const last = inners.length - 1;
+    const blank = (k: number) => inners[k]!.trim() === "";
+    const lone = inners.length === 1 && count > 1 && !line.lead && !line.trail;
+    const lead = line.lead || (lone && map[0] !== 0) || blank(0);
+    const trail = line.trail || (lone && map[0] === 0) || blank(last);
+    const space = spaced ? " " : "";
+    const written = inners.map((inner, k) => {
+      if (blank(k)) return inner;
+      const o = map[k];
+      const wasFirst = o === 0 && !line.lead;
+      const wasLast = o === count - 1 && !line.trail;
+      let s = inner;
+      if (k === 0 && !lead && !wasFirst) s = s.trimStart();
+      else if (wasFirst && (k > 0 || lead) && !/^[ \t]/.test(s)) s = space + s;
+      if (k === last && !trail && !wasLast) s = s.trimEnd();
+      else if (wasLast && (k < last || trail) && !/[ \t]$/.test(s)) s = s + space;
+      return s;
+    });
+    return line.head + (lead ? "|" : "") + written.join("|") + (trail ? "|" : "") + line.tail;
+  };
+
+  /**
+   * Cell `k` of `count` without the pipes around it or the spaces after a closing pipe; null when
+   * the pipes are not where `line` says.
+   */
+  const innerOf = (cell: string, k: number, count: number, line: Pick<Line, "lead" | "trail">): string | null => {
+    let inner = cell;
+    if (k > 0 || line.lead) {
+      if (!inner.startsWith("|")) return null;
+      inner = inner.slice(1);
+    }
+    if (k === count - 1 && line.trail) {
+      const pipe = /\|[ \t]*$/.exec(inner);
+      if (!pipe) return null;
+      inner = inner.slice(0, pipe.index);
+    }
+    return inner;
+  };
+
+  const rowLine = (row: Node): Line | null => {
+    const cells = childNodes(row);
+    if (cells.length === 0) return null;
+    const r = range(row);
+    const first = range(cells[0]!);
+    const last = cells[cells.length - 1]!;
+    const lead = slice(cells[0]!).startsWith("|");
+    const map = source.chars.get(last);
+    const lastText = slice(last);
+    const afterContent =
+      map && map.contentEnd >= 0
+        ? text.slice(map.contentEnd, range(last).end)
+        : lastText.slice(cells.length > 1 || lead ? 1 : 0);
+    const line = { lead, trail: /^[ \t]*\|[ \t]*$/.test(afterContent) };
+    const inners: string[] = [];
+    for (let k = 0; k < cells.length; k++) {
+      const inner = innerOf(slice(cells[k]!), k, cells.length, line);
+      if (inner === null) return null;
+      inners.push(inner);
+    }
+    const tail = (line.trail ? /[ \t]*$/.exec(lastText)![0] : "") + text.slice(range(last).end, r.end);
+    return { ...line, inners, head: text.slice(r.start, first.start), tail };
+  };
+
+  /**
+   * Writes an edited table row by row and cell by cell. Unedited rows and cells keep their source,
+   * padding included; new rows and cells take the table's spacing, and are padded to the column
+   * width when every line of the table is. The delimiter row changes only for an added, removed or
+   * realigned column. Returns null when the header row was removed or a row was added above it.
+   */
+  const emitTable = (original: Node, edited: Node, prefix: string): string | null => {
+    const before = childNodes(original);
+    const after = childNodes(edited);
+    const n = before.length;
+    const rows = pair(before, after, shareACell);
+    if (n === 0 || rows[0] !== 0) return null;
+    const r = range(original);
+    const spans = before.map(range);
+    const gaps = [text.slice(r.start, spans[0]!.start)];
+    for (let k = 1; k < n; k++) gaps.push(text.slice(spans[k - 1]!.end, spans[k]!.start));
+    gaps.push(text.slice(spans[n - 1]!.end, r.end));
+
+    const afterHeader = gaps[1]!;
+    const lineFrom = afterHeader.indexOf("\n") + 1;
+    const delimiterAt = lineFrom > 0 ? afterHeader.slice(lineFrom).search(/[|:-]/) : -1;
+    if (delimiterAt < 0) return null;
+    const delimiterFrom = lineFrom + delimiterAt;
+    const delimiterTo = delimiterFrom + /^[|:\- \t]*[|:-]/.exec(afterHeader.slice(delimiterFrom))![0].length;
+    const delimiterText = afterHeader.slice(delimiterFrom, delimiterTo);
+    const lead = delimiterText.startsWith("|");
+    const trail = delimiterText.length > 1 && delimiterText.endsWith("|");
+    const delimiter: Line = {
+      head: "",
+      lead,
+      inners: delimiterText.slice(lead ? 1 : 0, trail ? -1 : undefined).split("|"),
+      trail,
+      tail: "",
+    };
+    const header = rowLine(before[0]!);
+    const columnCount = before[0]!.childCount;
+    if (!header || delimiter.inners.length !== columnCount) return null;
+    const bodyLines = before.slice(1).map(rowLine);
+
+    const spaced = header.inners.some((inner) => /^[ \t]/.test(inner));
+    const full = [header, delimiter, ...bodyLines].filter((l) => l?.inners.length === columnCount);
+    const widths = header.inners.map((_, k) => {
+      const shown = full.map((l) => columns(l!.inners[k]!));
+      return shown.every((w) => w === shown[0]) ? shown[0]! : null;
+    });
+    const padded = widths.every((w) => w !== null);
+    const oldAlign = original.attrs["align"] as (string | null)[];
+    const align = edited.attrs["align"] as (string | null)[];
+    const columnMap =
+      before[0] === after[0] ? widths.map((_, k) => k) : pair(childNodes(before[0]!), childNodes(after[0]!));
+
+    /** `content` with the table's spacing, padded to the width of column `k` when the table is padded. */
+    const pad = (content: string, k: number) => {
+      const body = spaced ? ` ${content} ` : content;
+      const o = columnMap[k];
+      const width = !padded || o === undefined ? 0 : o === null ? 3 + (spaced ? 2 : 0) : widths[o]!;
+      const room = width - columns(body);
+      if (room <= 0) return content === "" && spaced ? " " : body;
+      return body + " ".repeat(room);
+    };
+    const freshCell = (cell: Node, k: number) => pad(writeCell(cell, source.style), k);
+
+    const emitRow = (was: Node, row: Node, line: Line): string | null => {
+      if (was === row && !options.forceDescend) return slice(was);
+      const cells = childNodes(was);
+      const now = childNodes(row);
+      if (now.length === 0) return null;
+      const map = pair(cells, now);
+      const inners = now.map((cell, k) => {
+        const o = map[k] ?? null;
+        if (o === null) return freshCell(cell, k);
+        const written = emit(cells[o]!, cell, prefix);
+        return (written === null ? null : innerOf(written, o, cells.length, line)) ?? freshCell(cell, k);
+      });
+      return joinLine(line, inners, map, cells.length, spaced);
+    };
+    const writeRow = (row: Node) => {
+      const inners = childNodes(row).map(freshCell);
+      return joinLine({ ...header, head: "", tail: "" }, inners, [], 0, spaced);
+    };
+
+    /** Rewrites a delimiter cell for the alignment of column `k`, keeping its width where it can. */
+    const realign = (inner: string, k: number) => {
+      const [, before, dashes, after] = /^([ \t]*)(:?-+:?)([ \t]*)$/.exec(inner) ?? ["", "", "---", ""];
+      const left = align[k] === "left" || align[k] === "center" ? ":" : "";
+      const right = align[k] === "right" || align[k] === "center" ? ":" : "";
+      const width = Math.max(dashes.length, left.length + right.length + 1);
+      return before + left + "-".repeat(width - left.length - right.length) + right + after;
+    };
+    const delimiterSpaced = delimiter.inners.some((inner) => /^[ \t]/.test(inner));
+    const space = delimiterSpaced ? " " : "";
+    const newDelimiter = space + "-".repeat(padded ? (spaced ? 5 : 3) - space.length * 2 : 3) + space;
+    if (columnMap.length !== align.length) return null;
+    const delimiterInners = columnMap.map((o, k) =>
+      o !== null && oldAlign[o] === align[k]
+        ? delimiter.inners[o]!
+        : realign(o === null ? newDelimiter : delimiter.inners[o]!, k),
+    );
+
+    const headerOut = emitRow(before[0]!, after[0]!, header);
+    if (headerOut === null) return null;
+    const rowSeparator = source.eol + afterHeader.slice(lineFrom, delimiterFrom);
+    /** The gap after original row `o`; row 0's is the one after the delimiter row. */
+    const gapAfter = (o: number) => (o === 0 ? afterHeader.slice(delimiterTo) : gaps[o + 1]!);
+    const lineEnd = (gap: string) => /\r?\n/.exec(gap)?.index ?? gap.length;
+    /** The end of the line before a gap, and the line ending and prefix after another. */
+    const join = (a: string, b: string) => a.slice(0, lineEnd(a)) + b.slice(lineEnd(b));
+
+    let out =
+      gaps[0]! +
+      headerOut +
+      afterHeader.slice(0, delimiterFrom) +
+      joinLine(delimiter, delimiterInners, columnMap, columnCount, delimiterSpaced);
+    let previous: number | null = 0;
+    for (let k = 1; k < after.length; k++) {
+      const o = rows[k] ?? null;
+      const written =
+        o === null ? writeRow(after[k]!) : bodyLines[o - 1] ? emitRow(before[o]!, after[k]!, bodyLines[o - 1]!) : null;
+      if (written === null) return null;
+      out += join(previous === null ? "" : gapAfter(previous), o === null ? rowSeparator : gapAfter(o - 1)) + written;
+      previous = o;
+    }
+    return out + join(previous === null ? "" : gapAfter(previous), gapAfter(n - 1));
   };
 
   const body = emit(source.doc, doc, "") ?? rewrite(doc, "", null, 0) ?? "";
@@ -325,6 +550,93 @@ function childNodes(n: Node): Node[] {
   const out: Node[] = [];
   n.forEach((c) => out.push(c));
   return out;
+}
+
+/**
+ * For each node of `after`, the index of the node of `before` it is written from, or null for a new
+ * node. Unchanged nodes at either end pair with themselves. Between them, a node pairs with the
+ * next node `related` to it, and the nodes left over between two pairs pair by position.
+ */
+function pair(
+  before: readonly Node[],
+  after: readonly Node[],
+  related: (was: Node, now: Node) => boolean = () => false,
+): (number | null)[] {
+  const n = before.length;
+  const m = after.length;
+  let i = 0;
+  while (i < n && i < m && before[i] === after[i]) i++;
+  let j = 0;
+  while (j < n - i && j < m - i && before[n - 1 - j] === after[m - 1 - j]) j++;
+  const out = after.map((_, k): number | null => (k < i ? k : k >= m - j ? k - m + n : null));
+  let from = i;
+  for (let k = i; k < m - j; k++) {
+    for (let o = from; o < n - j; o++) {
+      if (!related(before[o]!, after[k]!)) continue;
+      out[k] = o;
+      from = o + 1;
+      break;
+    }
+  }
+  let previous = i - 1;
+  for (let k = i; k < m - j; k++) {
+    const o = out[k];
+    if (o !== null && o !== undefined) {
+      previous = o;
+      continue;
+    }
+    let next = k;
+    while (next < m - j && out[next] === null) next++;
+    const limit = next < m - j ? out[next]! : n - j;
+    for (let t = k; t < next && previous + 1 < limit; t++) out[t] = ++previous;
+    k = next - 1;
+  }
+  return out;
+}
+
+/** True when two rows share a cell. */
+function shareACell(was: Node, now: Node): boolean {
+  const cells = new Set<Node>();
+  was.forEach((cell) => cells.add(cell));
+  let shared = false;
+  now.forEach((cell) => (shared ||= cells.has(cell)));
+  return shared;
+}
+
+/** East Asian wide and fullwidth code points, as inclusive ranges. */
+const wideRanges: readonly (readonly [number, number])[] = [
+  [0x1100, 0x115f],
+  [0x2e80, 0xa4cf],
+  [0xac00, 0xd7a3],
+  [0xf900, 0xfaff],
+  [0xfe30, 0xfe4f],
+  [0xff00, 0xff60],
+  [0xffe0, 0xffe6],
+  [0x20000, 0x3fffd],
+];
+const emoji = /^\p{Emoji_Presentation}$/u;
+const mark = /^\p{M}$/u;
+const zeroWidthJoiner = 0x200d;
+const textPresentation = 0xfe0e;
+const emojiPresentation = 0xfe0f;
+
+/** How many columns `s` takes in a monospaced font: emoji and East Asian wide characters take two. */
+function columns(s: string): number {
+  let width = 0;
+  let last = 0;
+  for (const c of s) {
+    const code = c.codePointAt(0)!;
+    if (code === emojiPresentation) {
+      width += last === 1 ? 1 : 0;
+      last = 0;
+      continue;
+    }
+    const zero = code === zeroWidthJoiner || code === textPresentation || mark.test(c);
+    const wide = emoji.test(c) || wideRanges.some(([from, to]) => code >= from && code <= to);
+    last = zero ? 0 : wide ? 2 : 1;
+    width += last;
+  }
+  return width;
 }
 
 /** Joins the end of the line before a deleted block to the blank lines and indentation after it. */

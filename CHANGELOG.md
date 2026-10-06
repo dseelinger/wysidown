@@ -5,6 +5,15 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Tables can be edited. Tab and Shift+Tab move between cells, and Tab in the last cell adds a
+  row; Enter moves to the cell below, adding a row at the end of the table. Right-clicking a
+  cell, or pressing the menu key or Shift+F10 in one, opens a menu that inserts and deletes rows
+  and columns and sets a column's alignment. Saving rewrites only the rows and cells you changed:
+  the others keep their spacing, padding and pipes exactly as they were. A new row or column is
+  written the way the table already is, with or without pipes at the ends of each line, and
+  padded to the column widths when the table is padded; a `|` typed into a cell is saved as `\|`.
+  Pasting into a cell keeps the pasted text on one line. The header row shows in bold, and each
+  column shows its alignment.
 - In VS Code, the last characters typed are no longer lost when the Wysidown tab is hidden or
   closed straight afterwards. Switching to another tab, or closing one of two Wysidown tabs showing
   the same file, could drop everything typed after the first character of a quick burst, and

@@ -4,7 +4,20 @@ import { describe, expect, test } from "vitest";
 import { fixtures, realisticCases } from "./support/corpus.ts";
 import { editCases, type EditKind } from "./support/edits.ts";
 
-const kinds: readonly EditKind[] = ["word", "markdown characters", "bold", "insert", "delete", "toggle", "new item"];
+const kinds: readonly EditKind[] = [
+  "word",
+  "markdown characters",
+  "bold",
+  "insert",
+  "delete",
+  "toggle",
+  "new item",
+  "new row",
+  "delete row",
+  "new column",
+  "delete column",
+  "align",
+];
 
 /** Realistic-corpus edits that change more than the edited block, by design. */
 const wider = new Set([

@@ -6,6 +6,7 @@ import { EditorView } from "prosemirror-view";
 import { listKeys } from "./lists.ts";
 import { clipboardParser, domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
+import { tableKeys, tables } from "./tables.ts";
 
 export interface Editor {
   /** Passes a message from the host to the editor. */
@@ -30,7 +31,7 @@ export function createEditor(
 ): Editor {
   const undoable =
     options.history === false ? [] : [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo })];
-  const plugins = [...undoable, keymap(listKeys), keymap(baseKeymap)];
+  const plugins = [...undoable, keymap(tableKeys), keymap(listKeys), keymap(baseKeymap), tables()];
   const session = new Session(post, plugins);
   const view = new EditorView(place, {
     state: session.state,

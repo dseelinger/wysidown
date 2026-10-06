@@ -24,6 +24,14 @@ export function writeBlocks(nodes: readonly Node[], style: Style): string {
   }).replace(/\n$/, "");
 }
 
+/** Writes a table cell's inline content with its pipes escaped, without the pipes and padding around it. */
+export function writeCell(cell: Node, style: Style): string {
+  if (cell.childCount === 0) return "";
+  const { table, table_row } = cell.type.schema.nodes;
+  const written = writeBlocks([table!.create({ align: [null] }, table_row!.create(null, cell))], style);
+  return written.slice(0, written.indexOf("\n")).slice(2, -2);
+}
+
 function children(n: Node): M.RootContent[] {
   const out: M.RootContent[] = [];
   n.forEach((c) => out.push(toBlock(c)));

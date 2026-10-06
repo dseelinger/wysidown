@@ -4,6 +4,14 @@ import { parseMarkdown } from "../../src/markdown/parse.ts";
 import { schema } from "../../src/markdown/schema.ts";
 import { serializeMarkdown } from "../../src/markdown/serialize.ts";
 import type { MarkdownSource } from "../../src/markdown/source.ts";
+import {
+  alignTableColumn,
+  deleteTableColumn,
+  deleteTableRow,
+  insertTableColumn,
+  insertTableRow,
+  type Alignment,
+} from "../../src/markdown/tables.ts";
 import { sameDocument } from "../../src/markdown/verify.ts";
 import { writeBlocks } from "../../src/markdown/write.ts";
 
@@ -27,7 +35,19 @@ export interface Case {
   source: MarkdownSource;
 }
 
-export type EditKind = "word" | "markdown characters" | "bold" | "insert" | "delete" | "toggle" | "new item";
+export type EditKind =
+  | "word"
+  | "markdown characters"
+  | "bold"
+  | "insert"
+  | "delete"
+  | "toggle"
+  | "new item"
+  | "new row"
+  | "delete row"
+  | "new column"
+  | "delete column"
+  | "align";
 
 /** Applies every edit of one kind to `input`, one at a time, and classifies each. */
 export function editCases(input: string, kind: EditKind): Case[] {
@@ -141,8 +161,124 @@ export function editCases(input: string, kind: EditKind): Case[] {
         return true;
       });
       break;
+    case "new row":
+      for (const { node, pos } of tables(source.doc)) {
+        for (let k = 0; k < node.childCount; k++) {
+          const row = source.ranges.get(node.child(k))!.end + offset;
+          const end = lineEnd(input, k === 0 ? nextLine(input, row) : row);
+          record(
+            insertTableRow(new Transform(source.doc), pos, k + 1),
+            (output) => output.slice(0, end) === input.slice(0, end) && output.endsWith(input.slice(end)),
+          );
+        }
+      }
+      break;
+    case "delete row":
+      for (const { node, pos } of tables(source.doc)) {
+        for (let k = 1; k < node.childCount; k++) {
+          const row = source.ranges.get(node.child(k))!;
+          const from = input.lastIndexOf("\n", row.start + offset - 1) + 1;
+          const to = nextLine(input, row.end + offset);
+          const expected = input.slice(0, to).endsWith("\n")
+            ? input.slice(0, from) + input.slice(to)
+            : input.slice(0, from).replace(/\r?\n$/, "");
+          record(deleteTableRow(new Transform(source.doc), pos, k), (output) => output === expected);
+        }
+      }
+      break;
+    case "new column":
+    case "delete column":
+      for (const { node, pos } of tables(source.doc)) {
+        const columns = node.child(0).childCount;
+        const r = source.ranges.get(node)!;
+        for (let c = 0; c <= columns; c++) {
+          if (kind === "new column") {
+            record(insertTableColumn(new Transform(source.doc), pos, c), (output) =>
+              linesChangedBy(input, output, r.start + offset, r.end + offset, (a, b) => oneStretchRemoved(a, b)),
+            );
+          } else if (c < columns && columns > 1) {
+            record(deleteTableColumn(new Transform(source.doc), pos, c), (output) =>
+              linesChangedBy(
+                input,
+                output,
+                r.start + offset,
+                r.end + offset,
+                (a, b) => oneStretchRemoved(b, a) || emptyRow.test(b),
+              ),
+            );
+          }
+        }
+      }
+      break;
+    case "align":
+      for (const { node, pos } of tables(source.doc)) {
+        const header = source.ranges.get(node.child(0))!.end + offset;
+        const delimiter = nextLine(input, header);
+        const cycle: Alignment[] = [null, "left", "center", "right"];
+        (node.attrs["align"] as Alignment[]).forEach((a, c) => {
+          const next = cycle[(cycle.indexOf(a) + 1) % cycle.length]!;
+          record(alignTableColumn(new Transform(source.doc), pos, c, next), (output) =>
+            linesChangedBy(input, output, delimiter, lineEnd(input, delimiter), () => true),
+          );
+        });
+      }
+      break;
   }
   return cases;
+}
+
+function tables(doc: Node): { node: Node; pos: number }[] {
+  const out: { node: Node; pos: number }[] = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name === "table") out.push({ node, pos });
+    return !node.isTextblock && node.type.name !== "table";
+  });
+  return out;
+}
+
+/** The offset just after the line ending at or after `offset`, or the end of `text`. */
+function nextLine(text: string, offset: number): number {
+  const nl = text.indexOf("\n", offset);
+  return nl < 0 ? text.length : nl + 1;
+}
+
+/** The offset of the line ending at or after `offset`, or the end of `text`. */
+function lineEnd(text: string, offset: number): number {
+  const nl = text.indexOf("\n", offset);
+  if (nl < 0) return text.length;
+  return text[nl - 1] === "\r" ? nl - 1 : nl;
+}
+
+/** A table row holding one empty cell: what a row whose only cell was deleted becomes. */
+const emptyRow = /^[ \t>]*\|[ \t]*\|[ \t]*\r?$/;
+
+/** True when `small` is `large` with one stretch of characters taken out. */
+function oneStretchRemoved(small: string, large: string): boolean {
+  let pre = 0;
+  while (pre < small.length && small[pre] === large[pre]) pre++;
+  return large.length > small.length && large.endsWith(small.slice(pre));
+}
+
+/**
+ * True when `output` has as many lines as `input`, each the same as the input line or, for the
+ * lines that touch `[from, to)`, related to it by `changed(inputLine, outputLine)`.
+ */
+function linesChangedBy(
+  input: string,
+  output: string,
+  from: number,
+  to: number,
+  changed: (a: string, b: string) => boolean,
+): boolean {
+  const a = input.split("\n");
+  const b = output.split("\n");
+  if (a.length !== b.length) return false;
+  let start = 0;
+  return a.every((line, k) => {
+    const lineStart = start;
+    start += line.length + 1;
+    return line === b[k] || (lineStart + line.length >= from && lineStart < to && changed(line, b[k]!));
+  });
 }
 
 /** True when writing the whole document from scratch parses back to it. */

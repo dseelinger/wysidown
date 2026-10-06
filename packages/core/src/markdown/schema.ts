@@ -25,8 +25,9 @@ export const schema = new Schema({
     },
     thematic_break: { group: "block" },
     table: { group: "block", content: "table_row+", attrs: { align: { default: [] } } },
-    table_row: { content: "table_cell*" },
-    table_cell: { content: "inline*" },
+    table_row: { content: "table_cell+" },
+    /** A table cell is one line: it holds no hard break. */
+    table_cell: { content: "(text | image | raw_inline)*" },
     /**
      * `kind` is the mdast type (definition, footnoteDefinition, html, yaml, toml or math), or
      * `alert` for a top-level blockquote that starts with `[!NOTE]` and the like. `identifier` is
