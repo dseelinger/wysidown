@@ -47,7 +47,10 @@ export type EditKind =
   | "delete row"
   | "new column"
   | "delete column"
-  | "align";
+  | "align"
+  | "code word"
+  | "code line"
+  | "language";
 
 /** Applies every edit of one kind to `input`, one at a time, and classifies each. */
 export function editCases(input: string, kind: EditKind): Case[] {
@@ -223,8 +226,70 @@ export function editCases(input: string, kind: EditKind): Case[] {
         });
       }
       break;
+    case "code word":
+      for (const { node, pos } of codeBlocks(source.doc)) {
+        const m = /[A-Za-z]{3,}/.exec(node.textContent);
+        if (!m) continue;
+        const from = pos + 1 + m.index;
+        const r = source.ranges.get(node)!;
+        record(new Transform(source.doc).replaceWith(from, from + m[0].length, schema.text("EDITED")), (output) =>
+          wordReplaced(input, output, m[0], "EDITED", r.start + offset, r.end + offset),
+        );
+      }
+      break;
+    case "code line":
+      for (const { node, pos } of codeBlocks(source.doc)) {
+        const r = source.ranges.get(node)!;
+        const line = node.textContent === "" ? "added line" : "\nadded line";
+        record(
+          new Transform(source.doc).insert(pos + 1 + node.content.size, schema.text(line)),
+          (output) =>
+            confinedTo(r.start, r.end)(output) &&
+            (node.textContent === "" || oneLineAdded(input, output, "added line")),
+        );
+      }
+      break;
+    case "language":
+      for (const { node, pos } of codeBlocks(source.doc)) {
+        const r = source.ranges.get(node)!;
+        const lang = node.attrs["lang"] === "text" ? "plain" : "text";
+        const fenced = /^(`{3}|~{3})/.test(input.slice(r.start + offset));
+        record(
+          new Transform(source.doc).setNodeMarkup(pos, null, { ...node.attrs, lang }),
+          fenced
+            ? (output) => linesChangedBy(input, output, r.start + offset, r.start + offset + 1, () => true)
+            : confinedTo(r.start, r.end),
+        );
+      }
+      break;
   }
   return cases;
+}
+
+function codeBlocks(doc: Node): { node: Node; pos: number }[] {
+  const out: { node: Node; pos: number }[] = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name === "code_block") out.push({ node, pos });
+    return !node.isTextblock;
+  });
+  return out;
+}
+
+/** True when `output` is `input` with one occurrence of `word` inside `[from, to)` replaced by `by`. */
+function wordReplaced(input: string, output: string, word: string, by: string, from: number, to: number): boolean {
+  for (let at = input.indexOf(word, from); at >= 0 && at + word.length <= to; at = input.indexOf(word, at + 1)) {
+    if (output === input.slice(0, at) + by + input.slice(at + word.length)) return true;
+  }
+  return false;
+}
+
+/** True when `output` is `input` with one line added that ends with `line`. */
+function oneLineAdded(input: string, output: string, line: string): boolean {
+  const a = input.split("\n");
+  const b = output.split("\n");
+  return b.some(
+    (l, k) => l.replace(/\r$/, "").endsWith(line) && [...b.slice(0, k), ...b.slice(k + 1)].join("\n") === a.join("\n"),
+  );
 }
 
 function tables(doc: Node): { node: Node; pos: number }[] {

@@ -8,6 +8,7 @@ import {
   type ParseOptions,
 } from "prosemirror-model";
 import type { MarkViewConstructor, NodeViewConstructor } from "prosemirror-view";
+import { codeBlockView } from "./code.ts";
 import { listItemView } from "./lists.ts";
 
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -93,6 +94,7 @@ export function views(document: Document): {
     nodeViews[name] = (node) => DOMSerializer.renderSpec(document, spec(node));
   }
   nodeViews["list_item"] = listItemView(document);
+  nodeViews["code_block"] = codeBlockView(document);
   const markViews: Record<string, MarkViewConstructor> = {};
   for (const [name, spec] of Object.entries(marks)) {
     markViews[name] = (mark) => DOMSerializer.renderSpec(document, spec(mark));

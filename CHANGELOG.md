@@ -5,6 +5,17 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Code blocks keep their fences when edited. Saving after typing in a code block rewrites only the
+  lines you changed: the fence (backticks or tildes, and how many), its indentation, the info
+  string and the other lines stay as they were, and a new line inside a quote or list item gets
+  the same `>` or indentation as the lines beside it. Each code block has a language box above
+  it; typing a language there, or picking one from its suggestions, and pressing Enter changes
+  only the language in the opening fence, keeping anything written after it such as
+  `title="example.py"`. Clearing the box removes the language. Giving an indented code block a
+  language turns it into a fenced block in the same place. Tab in a code block types a tab, and
+  with several lines selected Tab and Shift+Tab add or remove a tab at the start of each; tabs
+  are saved as tabs and shown four columns wide. Enter in a code block inside a list item starts a
+  new line of code instead of a new list item.
 - Tables can be edited. Tab and Shift+Tab move between cells, and Tab in the last cell adds a
   row; Enter moves to the cell below, adding a row at the end of the table. Right-clicking a
   cell, or pressing the menu key or Shift+F10 in one, opens a menu that inserts and deletes rows

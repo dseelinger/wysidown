@@ -147,6 +147,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     const container = !original.isLeaf && !original.isTextblock;
     if (original === edited && !(options.forceDescend && container)) return slice(original);
     if (original.type !== edited.type) return null;
+    if (edited.type.name === "code_block") return options.inlineRewrite ? emitCode(original, edited, prefix) : null;
     if (edited.isTextblock) {
       if (!sameAttrs(original, edited)) return null;
       if (original.eq(edited)) return slice(original);
@@ -329,6 +330,126 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     const [, pipe, space, rest] = /^(\|?)([ \t]*)([^]*)$/.exec(cell)!;
     if (content === "") return cell;
     return pipe! + " " + content + (space!.length > 1 ? space!.slice(1) : " ") + rest!;
+  };
+
+  /**
+   * Writes an edited code block keeping its fences and the source of every unchanged line; a new
+   * language rewrites only the info string, and an indented block given one is written fenced with
+   * each line's prefix kept. Returns null for a line that would close the fence, and for source
+   * lines that do not end with the code's lines.
+   */
+  const emitCode = (original: Node, edited: Node, prefix: string): string | null => {
+    if (original.eq(edited)) return slice(original);
+    const r = range(original);
+    /** The block's lines from the start of its first line; `end` is before the line ending. */
+    const lines: { start: number; end: number }[] = [];
+    for (let at = text.lastIndexOf("\n", r.start - 1) + 1; at <= r.end;) {
+      const nl = text.indexOf("\n", at);
+      const stop = nl < 0 || nl >= r.end ? r.end : nl;
+      lines.push({ start: at, end: stop > at && text[stop - 1] === "\r" ? stop - 1 : stop });
+      at = stop + 1;
+    }
+    const lineText = (k: number) => text.slice(lines[k]!.start, lines[k]!.end);
+    const open = /^(`{3,}|~{3,})([ \t]*)([^\r\n]*)$/.exec(text.slice(r.start, lines[0]!.end));
+    const fence = open?.[1] ?? "";
+    /** True when `line`, after the prefix `lead` matches, would close the fence. */
+    const closer = (line: string, lead: RegExp) => {
+      const m = new RegExp(lead.source + /(`+|~+)[ \t]*$/.source).exec(line);
+      return m !== null && fence !== "" && m[1]!.startsWith(fence.charAt(0)) && m[1]!.length >= fence.length;
+    };
+
+    const from = open ? 1 : 0;
+    let to = lines.length - (open && lines.length > 1 && closer(lineText(lines.length - 1), /^[ \t>]*/) ? 1 : 0);
+    const value = original.textContent;
+    let values = value === "" ? [] : value.split("\n");
+    if (value === "" && to - from === 1) values = [""];
+    else if (to - from === values.length + 1 && lineText(to - 1) === "") to--;
+    if (to - from !== values.length) return null;
+    const content = lines.slice(from, to);
+    const prefixes: string[] = [];
+    for (let k = 0; k < content.length; k++) {
+      const line = lineText(from + k);
+      const lead = prefixOf(line, values[k]!);
+      if (lead === null) return null;
+      prefixes.push(lead);
+    }
+
+    const ownLine = /^[ \t>]*$/.test(text.slice(lines[0]!.start, r.start));
+    const usable = values.flatMap((v, k) => (v !== "" && (open || k > 0 || ownLine) ? [k] : []));
+    /** The prefix for a new line `k`, from the nearest line that has content. */
+    const prefixAt = (k: number) => {
+      if (!open && k === 0) return prefixes[0]!.slice(r.start - content[0]!.start);
+      let best: number | null = null;
+      for (const u of usable) if (best === null || Math.abs(u - k) < Math.abs(best - k)) best = u;
+      return best === null ? prefix + (open ? "" : "    ") : prefixes[best]!;
+    };
+    const lang = edited.attrs["lang"] as string | null;
+    const meta = edited.attrs["meta"] as string | null;
+    if ((lang === null && meta !== null) || (lang !== null && /\s/.test(lang))) return null;
+
+    if (!open && !sameAttrs(original, edited)) {
+      const outdent = (lead: string) => untilColumn(lead, width(lead) - 4);
+      const first = outdent(prefixes[0]!);
+      const body = outdent(prefixAt(1));
+      if (first === null || body === null) return null;
+      // The fence goes where `first` ends, or, when the text before the block reaches past that, up
+      // to three columns later with every line indented to match.
+      const head = text.slice(content[0]!.start, r.start);
+      const past = width(head) - width(first);
+      if (past > 3) return null;
+      const lead = first.startsWith(head) ? first.slice(head.length) : " ".repeat(Math.max(0, -past));
+      const indent = " ".repeat(Math.max(0, past));
+      const now = edited.textContent.split("\n");
+      const style = source.style.fence;
+      const char = lang?.includes(style) ? (style === "`" ? "~" : "`") : style;
+      const run = char === "`" ? /^[ \t]*(`*)/ : /^[ \t]*(~*)/;
+      const runs = now.map((line) => run.exec(line)![1]!.length);
+      const written = char.repeat(Math.max(3, ...runs.map((run) => run + 1)));
+      return [
+        lead + written + (lang ?? "") + (meta === null ? "" : ` ${meta}`),
+        ...now.map((line) => (line === "" ? body.trimEnd() : body + indent + line)),
+        body + indent + written,
+      ].join(source.eol);
+    }
+
+    let out = slice(original);
+    const replace = (start: number, end: number, by: string) => {
+      out = out.slice(0, start - r.start) + by + out.slice(end - r.start);
+    };
+
+    if (!original.content.eq(edited.content)) {
+      const now = edited.textContent === "" ? [] : edited.textContent.split("\n");
+      const n = values.length;
+      const m = now.length;
+      let i = 0;
+      while (i < n && i < m && values[i] === now[i]) i++;
+      let j = 0;
+      while (j < n - i && j < m - i && values[n - 1 - j] === now[m - 1 - j]) j++;
+      // The first line of an indented block holds whatever precedes the block on its line.
+      if (!open && i === 0 && (m - j === 0 || n - j === 0)) return null;
+      if (open && now.slice(i, m - j).some((line) => closer(line, /^ {0,3}/))) return null;
+      const written = now
+        .slice(i, m - j)
+        .map((line, k) => (line === "" ? prefixAt(i + k).trimEnd() : prefixAt(i + k) + line))
+        .join(source.eol);
+      const before = i > 0 ? content[i - 1]!.end : lines[0]!.end;
+      if (i < n - j) {
+        if (m - j > i) replace(Math.max(content[i]!.start, r.start), content[n - 1 - j]!.end, written);
+        else replace(before, content[n - 1 - j]!.end, "");
+      } else {
+        replace(before, before, source.eol + written);
+      }
+    }
+
+    if (open && !sameAttrs(original, edited)) {
+      if (fence.startsWith("`") && lang?.includes("`")) return null;
+      const info = open[3]!;
+      const kept = meta === original.attrs["meta"];
+      const rest = kept ? info.slice(/^\S*/.exec(info)![0].length) : meta === null ? "" : ` ${meta}`;
+      const start = r.start + fence.length;
+      replace(start, start + open[2]!.length + info.length, lang === null ? "" : open[2]! + lang + rest);
+    }
+    return out;
   };
 
   /** One line of a table: its cells' text between the pipes, and whether it has outer pipes. */
@@ -637,6 +758,44 @@ function columns(s: string): number {
     width += last;
   }
   return width;
+}
+
+/**
+ * `line` up to the column where `value`, which ends it, starts. Leading spaces of `value` may
+ * stand for part of a tab in `line`; a tab across that column becomes spaces. Null when `line`
+ * does not end with `value`.
+ */
+function prefixOf(line: string, value: string): string | null {
+  if (line.endsWith(value)) return line.slice(0, line.length - value.length);
+  const core = value.replace(/^ +/, "");
+  if (!line.endsWith(core)) return null;
+  const lead = line.slice(0, line.length - core.length);
+  return untilColumn(lead, width(lead) - (value.length - core.length));
+}
+
+/** The column after `c` written at column `col`; tab stops are four columns apart. */
+function advance(col: number, c: string): number {
+  return c === "\t" ? col + 4 - (col % 4) : col + 1;
+}
+
+/** How many columns `lead` takes from the start of a line. */
+function width(lead: string): number {
+  let col = 0;
+  for (const c of lead) col = advance(col, c);
+  return col;
+}
+
+/** `lead` up to column `target`; a tab across it becomes spaces. Null when `lead` ends before it. */
+function untilColumn(lead: string, target: number): string | null {
+  let out = "";
+  let col = 0;
+  for (const c of lead) {
+    if (col >= target) break;
+    const next = advance(col, c);
+    out += next > target ? " ".repeat(target - col) : c;
+    col = Math.min(next, target);
+  }
+  return col === target ? out : null;
 }
 
 /** Joins the end of the line before a deleted block to the blank lines and indentation after it. */

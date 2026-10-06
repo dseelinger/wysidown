@@ -17,6 +17,9 @@ const kinds: readonly EditKind[] = [
   "new column",
   "delete column",
   "align",
+  "code word",
+  "code line",
+  "language",
 ];
 
 /** Realistic-corpus edits that change more than the edited block, by design. */

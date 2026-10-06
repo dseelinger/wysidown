@@ -4,7 +4,17 @@ import { serializeMarkdown } from "../src/markdown/serialize.ts";
 import { realisticCases } from "./support/corpus.ts";
 import { editCases, type EditKind } from "./support/edits.ts";
 
-const kinds: readonly EditKind[] = ["word", "markdown characters", "bold", "insert", "delete", "toggle"];
+const kinds: readonly EditKind[] = [
+  "word",
+  "markdown characters",
+  "bold",
+  "insert",
+  "delete",
+  "toggle",
+  "code word",
+  "code line",
+  "language",
+];
 
 describe("undoing an edit restores the original bytes", () => {
   // Undo applies inverted steps, which rebuild the edited nodes rather than reusing the originals.

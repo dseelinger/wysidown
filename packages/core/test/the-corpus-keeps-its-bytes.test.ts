@@ -6,8 +6,8 @@ import { filesUnder } from "./support/repo.ts";
 const corpus = join(import.meta.dirname, "corpus");
 
 describe("the corpus keeps its bytes", () => {
-  test("the corpus holds 33 realistic documents and 672 GFM spec examples", () => {
-    expect(filesUnder(join(corpus, "realistic"), /\.md$/)).toHaveLength(33);
+  test("the corpus holds 34 realistic documents and 672 GFM spec examples", () => {
+    expect(filesUnder(join(corpus, "realistic"), /\.md$/)).toHaveLength(34);
     expect(filesUnder(join(corpus, "spec"), /\.md$/)).toHaveLength(672);
   });
 
