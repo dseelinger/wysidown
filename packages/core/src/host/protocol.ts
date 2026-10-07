@@ -59,7 +59,8 @@ export type EditorMessage =
    */
   | { type: "flushed"; id: number }
   /**
-   * The user followed a link to another markdown file. `href` is the link's target as written,
-   * for the host to open the file it names (see `markdownLinkPath`).
+   * The user followed a link to another markdown file, or to a web or mail address. `href` is the
+   * link's target as written, for the host to open the file it names (see `markdownLinkPath`) or,
+   * for a scheme in `externalSchemes`, the address. `href` is untrusted.
    */
   | { type: "open"; href: string };

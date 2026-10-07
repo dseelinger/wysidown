@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as vscode from "vscode";
-import { folderOf, linkedFile } from "../src/resources.ts";
+import { folderOf, linkedAddress, linkedFile } from "../src/resources.ts";
 
 /** The URI of the file at the path joined from `parts`. */
 function file(...parts: string[]): string {
@@ -57,5 +57,29 @@ suite("links and images resolve against the document's folder and repository", (
     assert.equal(linkedFile({ type: "ready" }, folder), null);
     assert.equal(linkedFile(null, folder), null);
     assert.equal(linkedFile({ type: "open", href: "a.md" }, null), null);
+  });
+
+  test("a link to the web or mail opens its address, with or without a folder", () => {
+    const open = (href: string) => linkedAddress({ type: "open", href })?.toString(true);
+    assert.equal(open("https://example.com/docs?q=1#top"), "https://example.com/docs?q=1#top");
+    assert.equal(open("HTTP://example.com/"), "http://example.com/");
+    assert.equal(open("mailto:team@example.com"), "mailto:team@example.com");
+  });
+
+  test("an address with any other scheme, and other messages, open nothing", () => {
+    for (const href of [
+      "file:///C:/Windows/System32/notepad.exe",
+      "javascript:alert(1)",
+      "ms-settings:privacy",
+      "command:workbench.action.terminal.new",
+      "vscode://file/C:/a.md",
+      "docs/install.md",
+      "#page",
+      42,
+    ]) {
+      assert.equal(linkedAddress({ type: "open", href }), null, String(href));
+    }
+    assert.equal(linkedAddress({ type: "ready" }), null);
+    assert.equal(linkedAddress(null), null);
   });
 });

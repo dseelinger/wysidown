@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import { EditorConnection } from "./editor-connection.ts";
-import { folderOf, linkedFile, remoteImages, resourcesOf } from "./resources.ts";
+import { folderOf, linkedAddress, linkedFile, remoteImages, resourcesOf } from "./resources.ts";
 
 /** Shows a markdown `TextDocument` in the Wysidown editor, in a webview. */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
@@ -32,6 +32,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       if (message.type === "load") this.#loaded.fire(document);
     });
     const subscription = webview.onDidReceiveMessage((message: unknown) => {
+      const address = linkedAddress(message);
+      if (address) return vscode.env.openExternal(address);
       const linked = linkedFile(message, folder);
       return linked ? openLinked(linked) : connection.receive(message);
     });

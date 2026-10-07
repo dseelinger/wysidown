@@ -100,15 +100,12 @@ test("Ctrl+click or Open on a link to a markdown file asks the host to open it",
   expect(await hostText(page)).toBe(doc);
 });
 
-test("a plain click on a link places the cursor, and a link to the web has no Open button", async ({
-  harness: page,
-}) => {
+test("a plain click on a link places the cursor and opens nothing", async ({ harness: page }) => {
   await load(page, fixture("35-inline-links.md"));
   await caret(page, "style guide");
   const popover = page.getByRole("dialog", { name: "Link" });
   await expect(popover.getByRole("button", { name: "Open" })).toBeVisible();
   await caret(page, "the docs");
   await expect(popover.getByRole("button", { name: "Edit" })).toBeVisible();
-  await expect(popover.getByRole("button", { name: "Open" })).toBeHidden();
   expect(await opened(page)).toEqual([]);
 });

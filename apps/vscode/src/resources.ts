@@ -1,4 +1,4 @@
-import { markdownLinkPath, type Resources } from "@wysidown/core";
+import { externalSchemes, isExternalLink, markdownLinkPath, type Resources } from "@wysidown/core";
 import * as vscode from "vscode";
 
 /** A document's folder, and the root that its paths starting with `/` resolve against. */
@@ -50,4 +50,22 @@ export function linkedFile(message: unknown, folder: Folder | null): vscode.Uri 
   const path = markdownLinkPath(m.href);
   if (path === null) return null;
   return vscode.Uri.joinPath(path.startsWith("/") ? folder.root : folder.dir, path);
+}
+
+/**
+ * The web or mail address that an `open` message from the editor names; null for any other message,
+ * and for an address whose scheme is not in `externalSchemes`. `message` is untrusted.
+ */
+export function linkedAddress(message: unknown): vscode.Uri | null {
+  if (typeof message !== "object" || message === null) return null;
+  const m = message as { type?: unknown; href?: unknown };
+  if (m.type !== "open" || typeof m.href !== "string" || !isExternalLink(m.href)) return null;
+  let uri: vscode.Uri;
+  try {
+    uri = vscode.Uri.parse(m.href, true);
+  } catch {
+    return null;
+  }
+  const scheme = uri.scheme.toLowerCase();
+  return externalSchemes.includes(scheme) ? uri.with({ scheme }) : null;
 }

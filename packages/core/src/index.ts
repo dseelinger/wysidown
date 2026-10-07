@@ -3,7 +3,7 @@ export { schema } from "./markdown/schema.ts";
 export { parseMarkdown } from "./markdown/parse.ts";
 export { definitionTarget, retargetDefinition, type LinkTarget } from "./markdown/links.ts";
 export { headingAnchors } from "./markdown/anchors.ts";
-export { markdownExtensions, markdownLinkPath } from "./markdown/paths.ts";
+export { externalSchemes, isExternalLink, markdownExtensions, markdownLinkPath } from "./markdown/paths.ts";
 export { serializeMarkdown, type SaveResult, type Step } from "./markdown/serialize.ts";
 export type { MarkdownSource, Range, Style } from "./markdown/source.ts";
 export {

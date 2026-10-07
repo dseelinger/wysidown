@@ -1,6 +1,7 @@
 import {
   definitionTarget,
   headingAnchors,
+  isExternalLink,
   markdownLinkPath,
   retargetDefinition,
   schema,
@@ -131,19 +132,22 @@ export function setLink(at: LinkAt | null, text: string, href: string): Command 
   };
 }
 
-/** True when the editor can follow a link to `href`: a heading in this document, or another markdown file. */
+/**
+ * True when the editor can follow a link to `href`: a heading in this document, another markdown
+ * file, or a web or mail address.
+ */
 export function followable(href: string): boolean {
-  return href.startsWith("#") || markdownLinkPath(href) !== null;
+  return href.startsWith("#") || markdownLinkPath(href) !== null || isExternalLink(href);
 }
 
 /**
  * Follows a link to `href`. A `#` target puts the cursor in the heading with that anchor and
- * scrolls it to the top; a link to another markdown file is passed to `open`. Returns false when
- * the link leads nowhere the editor can go.
+ * scrolls it to the top; a link to another markdown file or to a web or mail address is passed to
+ * `open`. Returns false when the link leads nowhere the editor can go.
  */
 export function follow(view: EditorView, href: string, open: (href: string) => void): boolean {
   if (!href.startsWith("#")) {
-    if (markdownLinkPath(href) === null) return false;
+    if (!followable(href)) return false;
     open(href);
     return true;
   }
@@ -345,7 +349,7 @@ class LinkPopover {
 /**
  * Shows a link's target under it, edits links from the bubble or with Mod-k, and follows links
  * from the bubble or with Mod-click. `open` is called with the target of a link to another
- * markdown file.
+ * markdown file or to a web or mail address.
  */
 export function links(open: (href: string) => void): Plugin {
   let popover: LinkPopover | null = null;

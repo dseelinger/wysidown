@@ -5,6 +5,9 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Ctrl+click on a link to a web page or an email address, or Open in the link's bubble, opens it
+  in your browser or mail program. A reference link opens the address in its definition. Links
+  with any other scheme, such as `file:` or `javascript:`, do not open.
 - In VS Code, undo after typing in Wysidown removes the last word typed, not the last character.
   Typing reaches the file a word at a time: at each space, after a second without typing, and at
   once on Enter, a paste, a deletion of more than one character, a cursor move, a save, or any key

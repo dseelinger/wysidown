@@ -1,4 +1,4 @@
-import { markdownLinkPath, type Resources } from "@wysidown/core";
+import { externalSchemes, isExternalLink, markdownLinkPath, type Resources } from "@wysidown/core";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -88,4 +88,21 @@ export function linkedFile(message: unknown, folder: Folder | null): string | nu
   const path = markdownLinkPath(m.href);
   if (path === null) return null;
   return path.startsWith("/") ? join(folder.root, path) : resolve(folder.dir, path);
+}
+
+/**
+ * The web or mail address that an `open` message from the editor names, as a URL; null for any
+ * other message, and for an address whose scheme is not in `externalSchemes`. `message` is untrusted.
+ */
+export function linkedAddress(message: unknown): string | null {
+  if (typeof message !== "object" || message === null) return null;
+  const m = message as { type?: unknown; href?: unknown };
+  if (m.type !== "open" || typeof m.href !== "string" || !isExternalLink(m.href)) return null;
+  let url: URL;
+  try {
+    url = new URL(m.href);
+  } catch {
+    return null;
+  }
+  return externalSchemes.includes(url.protocol.slice(0, -1)) ? url.href : null;
 }

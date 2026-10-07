@@ -20,6 +20,15 @@ export function markdownLinkPath(href: string): string | null {
   return relative(path) && markdownFile.test(path) && !path.includes("\0") ? path : null;
 }
 
+/** The schemes of links that open outside the editor, in a browser or a mail program. */
+export const externalSchemes: readonly string[] = ["http", "https", "mailto"];
+
+/** True when `href` is a link to open outside the editor: its scheme is one of `externalSchemes`. */
+export function isExternalLink(href: string): boolean {
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(href)?.[1];
+  return scheme !== undefined && externalSchemes.includes(scheme.toLowerCase());
+}
+
 /** False for a path with a scheme or drive letter, a network path, and one starting with a backslash. */
 function relative(path: string): boolean {
   return !/^[a-z][a-z\d+.-]*:/i.test(path) && !/^[/\\]{2}/.test(path) && !path.startsWith("\\");

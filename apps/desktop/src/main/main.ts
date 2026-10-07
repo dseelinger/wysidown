@@ -1,9 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, type WebContents } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, type WebContents } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { HostDocument } from "./document.ts";
-import { fileScheme, folderOf, linkedFile, resourcesOf, serveImage, type Folder } from "./resources.ts";
+import { fileScheme, folderOf, linkedAddress, linkedFile, resourcesOf, serveImage, type Folder } from "./resources.ts";
 import { readSettings, writeSettings, type Settings } from "./settings.ts";
 
 const pageUrl = pathToFileURL(join(__dirname, "renderer", "index.html")).href;
@@ -223,6 +223,11 @@ function createWindow(): void {
 
 ipcMain.on("editor-message", (event, message: unknown) => {
   if (!fromPage(event.sender, event.senderFrame?.url)) return;
+  const address = linkedAddress(message);
+  if (address !== null) {
+    shell.openExternal(address).catch((error: unknown) => showError(`Wysidown cannot open ${address}.`, String(error)));
+    return;
+  }
   const linked = linkedFile(message, folder);
   if (linked === null) doc?.receive(message);
   else void openLinked(linked);
