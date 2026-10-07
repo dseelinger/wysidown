@@ -19,7 +19,8 @@ for (const key of ["Control+z", "Control+y", "Control+Shift+z"]) {
     await load(page, blog);
     await caret(page, paragraph, "End");
     await page.keyboard.type(" Really.");
-    await settled(page);
+    // Typing reaches the host after a pause; until then the editor handles undo and redo itself.
+    await expect.poll(() => hostText(page)).toBe(blog.replace(paragraphEnd, paragraphEnd + " Really."));
     await page.keyboard.press(key);
     await settled(page);
     expect(await page.evaluate(() => (window as unknown as { keysSeen: string[] }).keysSeen)).toEqual([key.slice(-1)]);

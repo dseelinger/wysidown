@@ -52,6 +52,7 @@ const harness: Harness = {
   change: (text) => {
     host.change(text);
   },
+  flush: () => host.flush(),
   resources: (resources) => {
     toEditor({ type: "resources", ...resources });
   },

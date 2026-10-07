@@ -16,13 +16,15 @@ export class Wire {
   readonly session: Session;
   readonly host: MemoryHost;
 
-  constructor(text: string) {
+  /** `hold` is the session's pause before it sends typing, in milliseconds. */
+  constructor(text: string, hold = 0) {
     this.session = new Session(
       (m) => {
         if (m.type === "edit") this.edits.push(m);
         this.toHost.push(m);
       },
       [history()],
+      hold,
     );
     this.host = new MemoryHost((m) => this.toEditor.push(m), text);
     this.toHost.push({ type: "ready" });
@@ -35,7 +37,8 @@ export class Wire {
 
   /** Applies a user transaction built on the current state. */
   edit(build: (state: EditorState) => Transaction): void {
-    this.session.update(this.state.apply(build(this.state)));
+    const tr = build(this.state);
+    this.session.update(this.state.apply(tr), tr);
   }
 
   /** Delivers the oldest message waiting for the host. */

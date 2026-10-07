@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- In VS Code, undo after typing in Wysidown removes the last word typed, not the last character.
+  Typing reaches the file a word at a time: at each space, after a second without typing, and at
+  once on Enter, a paste, a deletion of more than one character, a cursor move, a save, or any key
+  pressed with Ctrl or Alt.
 - Pasting keeps formatting as markdown. Content copied from a web page, Word or Google Docs keeps
   its headings, bold, italic, strikethrough, links, lists (nested and numbered), task lists, code
   and tables. Word's own formatting and empty lines are dropped. Images that are only on the

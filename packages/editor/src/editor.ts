@@ -20,9 +20,15 @@ export interface Editor {
 }
 
 export interface EditorOptions {
-  /** False when the host owns undo and redo: the editor keeps no history and leaves their keys to the host. */
+  /**
+   * False when the host owns undo and redo: the editor keeps no history, leaves their keys to the
+   * host, and sends typing a word at a time so that each word is one undo step in the host.
+   */
   history?: boolean;
 }
+
+/** Milliseconds typing waits for more typing before it is sent, when the host owns undo. */
+const typingPause = 1000;
 
 /**
  * Mounts the editor in `place` and sends `ready`. The host answers with `load`, and passes every
@@ -49,7 +55,7 @@ export function createEditor(
   ];
   let resources: Resources = noResources;
   const document = place.ownerDocument;
-  const session = new Session(post, plugins);
+  const session = new Session(post, plugins, options.history === false ? typingPause : 0);
   const view = new EditorView(place, {
     state: session.state,
     ...views(document, () => resources),
@@ -59,9 +65,38 @@ export function createEditor(
     dispatchTransaction(tr) {
       const state = view.state.apply(tr);
       view.updateState(state);
-      session.update(state);
+      session.update(state, tr);
     },
   });
+  // Held typing is sent before a key combination reaches the host and before the page loses the
+  // keyboard or is hidden, since a host may destroy the page then. Undo and redo while typing is
+  // held are handled here: the host would apply them before the held typing arrives.
+  const page = document.defaultView;
+  const sendHeld = () => {
+    session.sendHeld();
+  };
+  const sendHeldBeforeCombination = (event: KeyboardEvent) => {
+    if (!event.ctrlKey && !event.altKey && !event.metaKey) return;
+    if (["Control", "Alt", "AltGraph", "Meta", "Shift"].includes(event.key)) return;
+    const key = event.key.toLowerCase();
+    const command = (event.ctrlKey || event.metaKey) && !event.altKey;
+    const isUndo = command && key === "z" && !event.shiftKey;
+    const isRedo = command && (key === "y" || (key === "z" && event.shiftKey));
+    if ((isUndo || isRedo) && session.holding) {
+      // Redo after typing has nothing to redo once the typing reaches the host.
+      const before = isUndo ? session.undoHeld() : null;
+      if (before) view.updateState(before);
+      else session.sendHeld();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    session.sendHeld();
+  };
+  page?.addEventListener("keydown", sendHeldBeforeCombination, true);
+  page?.addEventListener("blur", sendHeld);
+  page?.addEventListener("pagehide", sendHeld);
+  document.addEventListener("visibilitychange", sendHeld);
   post({ type: "ready" });
   return {
     receive(message) {
@@ -82,6 +117,11 @@ export function createEditor(
     },
     view,
     destroy() {
+      session.sendHeld();
+      page?.removeEventListener("keydown", sendHeldBeforeCombination, true);
+      page?.removeEventListener("blur", sendHeld);
+      page?.removeEventListener("pagehide", sendHeld);
+      document.removeEventListener("visibilitychange", sendHeld);
       view.destroy();
     },
   };

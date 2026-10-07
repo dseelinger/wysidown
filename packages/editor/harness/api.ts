@@ -9,6 +9,8 @@ export interface Harness {
   load(text: string): void;
   /** Changes the text outside the editor. */
   change(text: string): void;
+  /** Asks the editor to send its changes, as a host does before a save; resolves with the host's text once it has. */
+  flush(): Promise<string>;
   /** Tells the editor where images and links lead. */
   resources(resources: Resources): void;
   /** Milliseconds each message takes to arrive, in either direction. */
