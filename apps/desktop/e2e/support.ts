@@ -104,7 +104,16 @@ export function readText(path: string): string {
 /** Clicks a menu item by its id. */
 export async function menu(
   app: ElectronApplication,
-  id: "open" | "save" | "save-as" | "remote-images" | "source-mode" | "theme-vscode" | "theme-github",
+  id:
+    | "open"
+    | "save"
+    | "save-as"
+    | "find"
+    | "replace"
+    | "remote-images"
+    | "source-mode"
+    | "theme-vscode"
+    | "theme-github",
 ): Promise<void> {
   await app.evaluate(({ Menu }, itemId) => {
     const item = Menu.getApplicationMenu()!.getMenuItemById(itemId)!;

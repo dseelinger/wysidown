@@ -22,6 +22,11 @@ const bridge: Bridge = {
       listener(on === true);
     });
   },
+  onFind(listener) {
+    ipcRenderer.on("find", (_event, replace: unknown) => {
+      listener(replace === true);
+    });
+  },
   onTheme(listener) {
     const current: unknown = ipcRenderer.sendSync("theme");
     if (isTheme(current)) listener(current);

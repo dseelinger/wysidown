@@ -2,6 +2,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { Annotation, EditorSelection, EditorState, Transaction } from "@codemirror/state";
 import { drawSelection, EditorView, highlightSpecialChars, keymap } from "@codemirror/view";
 import type { EditorMessage, HostMessage } from "@wysidown/core";
+import type { FindTarget } from "./find.ts";
+import { SourceFind } from "./source-find.ts";
 import type { SourceSelection } from "./source-selection.ts";
 import { SourceSession, type ShownChange } from "./source-session.ts";
 
@@ -10,6 +12,8 @@ export interface SourceEditor {
   /** Passes a message from the host to the pane. */
   receive(message: HostMessage): void;
   readonly view: EditorView;
+  /** Find and replace in the source, for the find bar. */
+  readonly find: FindTarget;
   /** The selection as offsets in the document's source. */
   sourceSelection(): SourceSelection;
   destroy(): void;
@@ -34,6 +38,15 @@ const theme = EditorView.theme({
     background: "var(--wysidown-selection)",
   },
   ".cm-specialChar": { color: "var(--wysidown-link)" },
+  ".cm-panels": { display: "none" },
+  ".cm-line .cm-searchMatch": {
+    background: "var(--wysidown-find-match-highlight)",
+    outline: "var(--wysidown-find-match-highlight-border)",
+  },
+  ".cm-line .cm-searchMatch.cm-searchMatch-selected": {
+    background: "var(--wysidown-find-match)",
+    outline: "var(--wysidown-find-match-border)",
+  },
 });
 
 /**
@@ -50,6 +63,7 @@ export function createSourceEditor(
   const session = new SourceSession(post);
   let selection = options.selection;
   let focus = options.focus === true;
+  const find = new SourceFind((): EditorView => view);
   const extensions = (loaded: boolean) => [
     history(),
     drawSelection(),
@@ -59,6 +73,7 @@ export function createSourceEditor(
     keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
     EditorView.editable.of(loaded),
     theme,
+    find.extension,
     EditorView.updateListener.of((update) => {
       for (const tr of update.transactions) {
         if (!tr.docChanged || tr.annotation(fromHost)) continue;
@@ -92,6 +107,7 @@ export function createSourceEditor(
           }),
         );
         view.dispatch({ effects: EditorView.scrollIntoView(head, { y: "center" }) });
+        find.restore();
         if (focus) view.focus();
         focus = false;
         return;
@@ -104,6 +120,7 @@ export function createSourceEditor(
       });
     },
     view,
+    find,
     sourceSelection() {
       const { main } = view.state.selection;
       return { anchor: session.fromShown(main.anchor), head: session.fromShown(main.head) };

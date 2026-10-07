@@ -210,6 +210,12 @@ function setSourceMode(editor: Editor, on: boolean): void {
   if (!contents.isDestroyed()) contents.send("source-mode", on);
 }
 
+/** Opens the find bar in the editor's window, with the replace row when `replace` is true. */
+function showFind(editor: Editor, replace: boolean): void {
+  const contents = editor.win.webContents;
+  if (!contents.isDestroyed()) contents.send("find", replace);
+}
+
 /** The editor a menu click acts on: the one whose window was clicked, else the one focused last. */
 function editorFor(window: BaseWindow | undefined): Editor | null {
   for (const editor of editors) if (editor.win === window) return editor;
@@ -243,7 +249,33 @@ function buildMenu(): Menu {
     },
     {
       label: "&Edit",
-      submenu: [{ role: "cut" }, { role: "copy" }, { role: "paste" }, { type: "separator" }, { role: "selectAll" }],
+      submenu: [
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { type: "separator" },
+        { role: "selectAll" },
+        { type: "separator" },
+        // The page handles the keys itself; the items open the bar when clicked.
+        {
+          id: "find",
+          label: "&Find",
+          accelerator: "CmdOrCtrl+F",
+          registerAccelerator: false,
+          click: onEditor((editor) => {
+            showFind(editor, false);
+          }),
+        },
+        {
+          id: "replace",
+          label: "&Replace",
+          accelerator: "CmdOrCtrl+H",
+          registerAccelerator: false,
+          click: onEditor((editor) => {
+            showFind(editor, true);
+          }),
+        },
+      ],
     },
     {
       label: "&View",

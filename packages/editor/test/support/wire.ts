@@ -1,6 +1,6 @@
 import type { EditorMessage, HostMessage } from "@wysidown/core";
 import { history } from "prosemirror-history";
-import type { EditorState, Transaction } from "prosemirror-state";
+import type { EditorState, Plugin, Transaction } from "prosemirror-state";
 import { MemoryHost } from "../../harness/memory-host.ts";
 import { Session } from "../../src/session.ts";
 
@@ -16,14 +16,14 @@ export class Wire {
   readonly session: Session;
   readonly host: MemoryHost;
 
-  /** `hold` is the session's pause before it sends typing, in milliseconds. */
-  constructor(text: string, hold = 0) {
+  /** `hold` is the session's pause before it sends typing, in milliseconds; `plugins` go in the state after the history. */
+  constructor(text: string, hold = 0, plugins: readonly Plugin[] = []) {
     this.session = new Session(
       (m) => {
         if (m.type === "edit") this.edits.push(m);
         this.toHost.push(m);
       },
-      [history()],
+      [history(), ...plugins],
       hold,
     );
     this.host = new MemoryHost((m) => this.toEditor.push(m), text);

@@ -5,6 +5,16 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Find and replace, in the editor and in the desktop app's source mode. Ctrl+F opens the find
+  bar and Ctrl+H opens it with a Replace box; in the desktop app they are also Edit > Find and
+  Edit > Replace. The bar works as VS Code's does: Match Case (Alt+C), Match Whole Word (Alt+W)
+  and Use Regular Expression (Alt+R), a count such as "3 of 12", Enter and Shift+Enter or F3 and
+  Shift+F3 for the next and previous match, Replace (Enter in the Replace box, or Ctrl+Shift+1)
+  and Replace All (Ctrl+Alt+Enter). A regular expression's replacement may use `$1` and `$&`.
+  Escape closes the bar. A space in the search also finds a line break inside a paragraph, which
+  the editor shows as a space. Text selected on one line fills the bar when it opens, and the search
+  stays when the desktop app switches to or from source mode. Replace All saves only the replaced
+  text, keeps bold, italic and links on it, and is undone in one step, in VS Code too.
 - In VS Code, Wysidown now looks like VS Code's Markdown preview of the same file: inline code in
   the editor's monospace font, code blocks as a panel with the language label in its corner, tables
   with a rule under the header and between rows, quotes with a bar on the left, a rule under

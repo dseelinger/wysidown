@@ -11,6 +11,8 @@ export interface Bridge {
   openFile(file: File): void;
   /** Calls `listener` when the host switches between the markdown source (true) and the rendered document. */
   onSourceMode(listener: (on: boolean) => void): void;
+  /** Calls `listener` when the user chooses Find (false) or Replace (true) from the menu. */
+  onFind(listener: (replace: boolean) => void): void;
   /** Calls `listener` with the theme at once, and again each time the user chooses one. */
   onTheme(listener: (theme: Theme) => void): void;
 }

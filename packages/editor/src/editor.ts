@@ -2,8 +2,11 @@ import type { EditorMessage, HostMessage, Resources } from "@wysidown/core";
 import { baseKeymap } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
+import type { EditorState } from "prosemirror-state";
 import { EditorView, type DirectEditorProps } from "prosemirror-view";
 import { codeKeys } from "./code.ts";
+import { DocumentFind } from "./document-find.ts";
+import type { FindTarget } from "./find.ts";
 import { highlighting } from "./highlight.ts";
 import { noResources } from "./images.ts";
 import { links } from "./links.ts";
@@ -20,6 +23,8 @@ export interface Editor {
   /** Passes a message from the host to the editor. */
   receive(message: HostMessage): void;
   readonly view: EditorView;
+  /** Find and replace in the document, for the find bar. */
+  readonly find: FindTarget;
   /** The selection as offsets in the document's source. Sends any held typing first. */
   sourceSelection(): SourceSelection;
   destroy(): void;
@@ -52,6 +57,17 @@ export function createEditor(
   const undoable =
     options.history === false ? [] : [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo })];
   const pastedImages = new PastedImages(post);
+  // A replacement is sent apart from held typing, so that it is one undo step in the host.
+  const find = new DocumentFind({
+    state: (): EditorState => view.state,
+    dispatch: (tr) => {
+      if (tr.docChanged) session.sendHeld();
+      view.dispatch(tr);
+    },
+    focus: () => {
+      view.focus();
+    },
+  });
   const plugins = [
     ...undoable,
     keymap(tableKeys),
@@ -63,6 +79,7 @@ export function createEditor(
     softBreaks(),
     paste(pastedImages),
     pastedImages.plugin,
+    ...find.plugins,
     links((href) => {
       post({ type: "open", href });
     }),
@@ -148,6 +165,7 @@ export function createEditor(
       }
     },
     view,
+    find,
     sourceSelection() {
       session.sendHeld();
       return sourceSelectionOf(view.state, session.text);

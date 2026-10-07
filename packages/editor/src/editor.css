@@ -27,6 +27,10 @@
     color-mix(in srgb, var(--wysidown-popup-foreground) 10%, transparent)
   );
   --wysidown-shadow: var(--vscode-widget-shadow, color-mix(in srgb, var(--wysidown-popup-foreground) 20%, transparent));
+  --wysidown-find-match: var(--vscode-editor-findMatchBackground, light-dark(#a8ac94, #515c6a));
+  --wysidown-find-match-highlight: var(--vscode-editor-findMatchHighlightBackground, #ea5c0055);
+  --wysidown-find-match-border: none;
+  --wysidown-find-match-highlight-border: none;
 }
 
 body.vscode-light,
@@ -300,6 +304,101 @@ body {
   display: contents;
 }
 
+.ProseMirror .ProseMirror-search-match {
+  background: var(--wysidown-find-match-highlight);
+  outline: var(--wysidown-find-match-highlight-border);
+}
+
+.ProseMirror .ProseMirror-active-search-match {
+  background: var(--wysidown-find-match);
+  outline: var(--wysidown-find-match-border);
+}
+
+.find-bar {
+  position: fixed;
+  top: 0;
+  right: 1.5em;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.2em;
+  padding: 0.3em 0.4em;
+  border: 1px solid var(--wysidown-popup-border);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  background: var(--wysidown-popup-background);
+  color: var(--wysidown-popup-foreground);
+  box-shadow: 0 2px 8px var(--wysidown-shadow);
+  font:
+    0.9em system-ui,
+    sans-serif;
+}
+
+.find-bar[hidden],
+.find-bar [hidden] {
+  display: none;
+}
+
+.find-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.find-input {
+  width: 16em;
+  padding: 0.15em 0.3em;
+  border: 1px solid var(--wysidown-input-border);
+  border-radius: 3px;
+  background: var(--wysidown-input-background);
+  color: var(--wysidown-input-foreground);
+  font: inherit;
+}
+
+.find-input:focus {
+  outline: 1px solid var(--wysidown-focus);
+  outline-offset: -1px;
+}
+
+.find-input.find-invalid {
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+.find-button {
+  min-width: 1.8em;
+  padding: 0.15em 0.35em;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.find-button:hover,
+.find-button:focus-visible {
+  background: var(--wysidown-hover);
+  outline: none;
+}
+
+.find-option[aria-pressed="true"] {
+  border-color: var(--vscode-inputOption-activeBorder, var(--wysidown-focus));
+  background: var(--vscode-inputOption-activeBackground, color-mix(in srgb, var(--wysidown-focus) 20%, transparent));
+}
+
+.find-count {
+  min-width: 5.5em;
+  padding: 0 0.3em;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
 /* Code tokens: VS Code's symbol colours in the extension, fixed light and dark colours elsewhere. */
 .ProseMirror .code-block {
   --token-keyword: var(--vscode-symbolIcon-keywordForeground, light-dark(#0000ff, #569cd6));
@@ -398,6 +497,9 @@ body.vscode-high-contrast {
   --wysidown-popup-border: var(--vscode-contrastBorder);
   --wysidown-input-border: var(--vscode-contrastBorder);
   --wysidown-focus: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder));
+  --wysidown-find-match-border: 2px solid var(--vscode-editor-findMatchBorder, var(--vscode-contrastActiveBorder));
+  --wysidown-find-match-highlight-border: 1px dotted
+    var(--vscode-editor-findMatchHighlightBorder, var(--vscode-contrastActiveBorder));
 }
 
 body.vscode-high-contrast .ProseMirror .raw,
@@ -417,6 +519,8 @@ body.vscode-high-contrast .ProseMirror code:not(.raw) {
     --wysidown-popup-border: CanvasText;
     --wysidown-input-border: CanvasText;
     --wysidown-focus: Highlight;
+    --wysidown-find-match-border: 2px solid Highlight;
+    --wysidown-find-match-highlight-border: 1px dotted CanvasText;
   }
 
   .ProseMirror .raw,
@@ -432,7 +536,10 @@ body.vscode-high-contrast .ProseMirror code:not(.raw) {
   .table-menu button:hover:enabled,
   .table-menu button:focus-visible,
   .link-popover button:hover,
-  .link-popover button:focus-visible {
+  .link-popover button:focus-visible,
+  .find-button:hover,
+  .find-button:focus-visible,
+  .find-option[aria-pressed="true"] {
     outline: 1px solid Highlight;
   }
 }

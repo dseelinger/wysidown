@@ -1,7 +1,7 @@
 // The browser harness: hosts the editor with an in-memory host, for Playwright. `?undo=host` leaves undo to the host;
 // `?pane=source` shows the source pane in place of the editor.
 import type { EditorMessage, HostMessage } from "@wysidown/core";
-import { createEditor, createSourceEditor } from "../src/index.ts";
+import { createEditor, createFindBar, createSourceEditor } from "../src/index.ts";
 import type { Harness } from "./api.ts";
 import { MemoryHost } from "./memory-host.ts";
 
@@ -47,6 +47,7 @@ const params = new URLSearchParams(location.search);
 const sourcePane = params.get("pane") === "source";
 const source = sourcePane ? createSourceEditor(place, toHost) : null;
 const editor = sourcePane ? null : createEditor(place, toHost, { history: params.get("undo") !== "host" });
+createFindBar(document).attach(source?.find ?? editor?.find ?? null);
 
 const harness: Harness = {
   text: () => host.text,

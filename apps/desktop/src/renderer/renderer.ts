@@ -1,6 +1,7 @@
 // The page: mounts the editor, or the source pane in source mode, and connects it to the main process through the preload bridge.
+// One find bar serves both panes, so its query carries over when the mode changes.
 import type { EditorMessage } from "@wysidown/core";
-import { createEditor, createSourceEditor, type Editor, type SourceEditor } from "@wysidown/editor";
+import { createEditor, createFindBar, createSourceEditor, type Editor, type SourceEditor } from "@wysidown/editor";
 import type {} from "./bridge.ts";
 
 const bridge = window.wysidown;
@@ -19,6 +20,12 @@ const post = (message: EditorMessage) => {
 };
 let pane: Editor | SourceEditor = createEditor(place, post);
 let sourceMode = false;
+const findBar = createFindBar(document);
+findBar.attach(pane.find);
+
+bridge.onFind((replace) => {
+  findBar.open(replace);
+});
 
 bridge.onMessage((message) => {
   pane.receive(message);
@@ -32,6 +39,7 @@ bridge.onSourceMode((on) => {
   pane.destroy();
   const options = { selection, focus: true };
   pane = on ? createSourceEditor(place, post, options) : createEditor(place, post, options);
+  findBar.attach(pane.find);
 });
 
 // A file dropped anywhere on the window opens it; the editor never sees the drop.
