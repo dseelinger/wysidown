@@ -11,6 +11,7 @@ export default defineConfig(
       "**/dist-test/",
       "**/dist-types/",
       "**/release/",
+      "scripts/*.d.mts",
       "**/.vscode-test/",
       "**/test-results/",
       "**/playwright-report/",

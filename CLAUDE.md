@@ -40,6 +40,7 @@ pnpm vitest run --project core          # one project
 pnpm check                              # the gate without end-to-end tests: opens no windows
 pnpm gate                               # the release gate, local only, no CI
 pnpm local                              # build, package, install the extension into VS Code
+pnpm release "<title>"                #  gate, build, changelog commit, tag; asks, then pushes and publishes
 pnpm icons                              # rebuild the app icons from assets/icon.svg (uses Edge)
 ```
 
@@ -61,6 +62,13 @@ and before installing if the installed `Wysidown.exe` is running. Open VS Code w
 extension after Developer: Reload Window.
 
 The desktop app and the extension share one version; a core test fails when they differ.
+
+`pnpm release "<title>"` (`scripts/release.mjs`) needs a clean tree on `main`, an unused tag
+`v<version>` and a signed-in `gh`. It runs `pnpm gate`, builds the installer and the `.vsix`
+(`wysidown-<version>.vsix`), turns `## Unreleased` into `## <version> — <title>` in one commit, and
+tags it. It then shows the notes and waits for `yes` before it pushes `main` and the tag and runs
+`gh release create` with both files. Releases are made only when the maintainer asks for one,
+never at the end of an issue. Builds are unsigned.
 
 - **Pinned toolchain.** Node `24.13.0` (`.node-version`) and pnpm `12.9.1` (`packageManager`),
   checked exactly by `scripts/check-toolchain.mjs`. Every dependency is pinned to an exact version
@@ -147,13 +155,13 @@ Tests walk up from their own folder to the nearest `pnpm-workspace.yaml` (`test/
 
 ## Repo layout
 
-| Path                         | What                                                                               |
-| ---------------------------- | ---------------------------------------------------------------------------------- |
-| `packages/core/`             | Markdown ↔ document, source map, serializer, host interfaces. No DOM, no host.     |
-| `packages/core/test/corpus/` | `realistic/` hand-written documents, `spec/` the 672 GFM spec examples.            |
-| `packages/editor/`           | The ProseMirror view both hosts load; `harness/` is a browser host for Playwright. |
-| `apps/desktop/`              | Electron app. `src/main` is the main process; `src/renderer` the page.             |
-| `apps/vscode/`               | VS Code extension; `test/` runs inside VS Code via `@vscode/test-cli`.             |
-| `scripts/`                   | `gate.mjs` (the release gate), `local.mjs` (`pnpm local`), `check-toolchain.mjs`.  |
-| `docs/spikes/`               | Spike reports.                                                                     |
-| `assets/icon.svg`            | The icon source for both apps; `pnpm icons` rebuilds their `.ico` and `.png`.      |
+| Path                         | What                                                                                           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `packages/core/`             | Markdown ↔ document, source map, serializer, host interfaces. No DOM, no host.                 |
+| `packages/core/test/corpus/` | `realistic/` hand-written documents, `spec/` the 672 GFM spec examples.                        |
+| `packages/editor/`           | The ProseMirror view both hosts load; `harness/` is a browser host for Playwright.             |
+| `apps/desktop/`              | Electron app. `src/main` is the main process; `src/renderer` the page.                         |
+| `apps/vscode/`               | VS Code extension; `test/` runs inside VS Code via `@vscode/test-cli`.                         |
+| `scripts/`                   | `gate.mjs`, `local.mjs` (`pnpm local`), `release.mjs` (`pnpm release`), `check-toolchain.mjs`. |
+| `docs/spikes/`               | Spike reports.                                                                                 |
+| `assets/icon.svg`            | The icon source for both apps; `pnpm icons` rebuilds their `.ico` and `.png`.                  |

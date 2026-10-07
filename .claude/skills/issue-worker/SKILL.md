@@ -183,6 +183,8 @@ Co-Authored-By: ...
 `Closes #4` is the line GitHub acts on when the maintainer pushes to `main`. Put it on the commit
 that finishes the issue, and on that one only; earlier commits for the same issue carry none.
 
+Never run `pnpm release`: releases are made only when the maintainer asks for one.
+
 Do not push, and do not open a PR. The commit stays local so a review has something to read and its
 findings can be amended into it.
 

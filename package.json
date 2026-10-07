@@ -21,6 +21,7 @@
     "gate": "node scripts/gate.mjs",
     "check": "node scripts/gate.mjs --no-e2e",
     "local": "node scripts/local.mjs",
+    "release": "node scripts/release.mjs",
     "icons": "node scripts/icons.mjs"
   },
   "devDependencies": {
