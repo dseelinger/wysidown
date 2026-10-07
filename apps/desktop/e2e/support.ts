@@ -14,7 +14,9 @@ export interface Launched {
 
 /**
  * Starts the built app with `args` on its command line and waits for its window. The app keeps its
- * settings in a new temporary folder unless `args` names one with `--user-data-dir=`.
+ * settings in a new temporary folder unless `args` names one with `--user-data-dir=`. The window
+ * is moved to the middle of a display other than the primary one when there is one, as the VS Code
+ * tests do; windows the app opens later are placed beside it.
  */
 export async function launch(...args: string[]): Promise<Launched> {
   const userData = args.some((a) => a.startsWith("--user-data-dir=")) ? [] : [userDataArgument(newFolder())];
@@ -22,6 +24,18 @@ export async function launch(...args: string[]): Promise<Launched> {
     args: [join(import.meta.dirname, "..", "dist", "main.cjs"), ...userData, ...args],
   });
   const window = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const primary = screen.getPrimaryDisplay();
+    const other = screen.getAllDisplays().find((d) => d.id !== primary.id);
+    if (!other) return;
+    const area = other.workArea;
+    for (const w of BrowserWindow.getAllWindows()) {
+      const { width, height } = w.getBounds();
+      const x = area.x + Math.max(0, Math.round((area.width - width) / 2));
+      const y = area.y + Math.max(0, Math.round((area.height - height) / 2));
+      w.setBounds({ x, y, width: Math.min(width, area.width), height: Math.min(height, area.height) });
+    }
+  });
   const errors: string[] = [];
   window.on("console", (m) => {
     if (m.type() !== "error" && m.type() !== "warning") return;
