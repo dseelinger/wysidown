@@ -2,7 +2,7 @@
   "name": "wysidown",
   "displayName": "Wysidown",
   "description": "WYSIWYG editing for GitHub Flavored Markdown that saves only what you changed.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "dseelinger",
   "license": "MIT",
   "private": true,

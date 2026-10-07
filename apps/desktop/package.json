@@ -1,6 +1,6 @@
 {
   "name": "@wysidown/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Wysidown: a WYSIWYG GitHub Flavored Markdown editor.",
@@ -10,7 +10,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "e2e": "playwright test",
-    "package": "electron-builder --dir --config electron-builder.yml"
+    "package": "electron-builder --dir --config electron-builder.yml",
+    "installer": "electron-builder --win nsis --config electron-builder.yml"
   },
   "dependencies": {
     "@wysidown/core": "workspace:*",

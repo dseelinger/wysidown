@@ -1,9 +1,23 @@
 appId: com.dseelinger.wysidown
 productName: Wysidown
+extraMetadata:
+  name: wysidown
+  productName: Wysidown
 directories:
   output: release
 files:
   - dist/**/*
   - package.json
+fileAssociations:
+  - ext: [md, markdown]
+    name: Wysidown.Markdown
+    description: Markdown document
+    role: Editor
 win:
-  target: dir
+  target: nsis
+nsis:
+  oneClick: true
+  perMachine: false
+  artifactName: ${productName}-Setup-${version}.${ext}
+  differentialPackage: false
+  createDesktopShortcut: false

@@ -5,6 +5,13 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app has a Windows installer, `Wysidown-Setup-0.1.0.exe`. It installs for your
+  account only, without asking for administrator rights, adds Wysidown to the Start menu, and can
+  be removed from Settings > Apps. Wysidown is listed under Open with for `.md` and `.markdown`
+  files and can be chosen as their default program. Opening another file while Wysidown is
+  running, by double-clicking it or from the command line, opens it in a new window of the
+  running app. The installer is not signed, so Windows SmartScreen warns the first time it runs.
+  The desktop app and the VS Code extension are now both version 0.1.0.
 - The desktop app has a source mode: View > Source Mode, or Ctrl+/, shows the markdown as plain
   text and switches back again. The cursor and any selection stay on the same text in both
   directions. Text typed in source mode is saved exactly as typed, a new line takes the file's

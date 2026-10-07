@@ -47,11 +47,15 @@ install → `prettier --check` → `eslint --max-warnings 0` → `tsc -b` → al
 `vsce package` and `electron-builder --dir`.
 
 A session that changes what the editor does ends with `pnpm gate` passing, then `pnpm local`
-(`scripts/local.mjs`). It builds and packages both apps, installs
-`apps/vscode/release/wysidown.vsix` with `code --install-extension --force`, and prints the desktop
-app's path, `apps/desktop/release/win-unpacked/Wysidown.exe`, and the extension version installed.
-It stops before building if `Wysidown.exe` is running or `code` is not on PATH. Open VS Code
-windows load the new extension after Developer: Reload Window.
+(`scripts/local.mjs`). It builds both apps and the desktop installer,
+`apps/desktop/release/Wysidown-Setup-<version>.exe`, runs the installer silently (a per-user install
+in `%LOCALAPPDATA%\Programs\wysidown`), installs `apps/vscode/release/wysidown.vsix` with
+`code --install-extension --force`, and prints the installed app's path and both versions. It stops
+before building if `Wysidown.exe` is running from `apps/desktop/release/` or `code` is not on PATH,
+and before installing if the installed `Wysidown.exe` is running. Open VS Code windows load the new
+extension after Developer: Reload Window.
+
+The desktop app and the extension share one version; a core test fails when they differ.
 
 - **Pinned toolchain.** Node `24.13.0` (`.node-version`) and pnpm `12.9.1` (`packageManager`),
   checked exactly by `scripts/check-toolchain.mjs`. Every dependency is pinned to an exact version
