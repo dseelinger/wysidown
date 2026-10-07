@@ -127,10 +127,30 @@ export async function messageBoxes(app: ElectronApplication): Promise<string[]> 
   return app.evaluate(() => (globalThis as unknown as { messageBoxes: string[] }).messageBoxes);
 }
 
-/** Clicks the end of the text `text` in the editor. */
+/** Clicks the end of the text `text` in the editor and waits for the editor to read the caret there. */
 export async function clickAtEnd(window: Page, text: string): Promise<void> {
-  await window.getByText(text).click();
+  const target = window.getByText(text);
+  await target.evaluate((element) => {
+    const page = globalThis as unknown as { caretAtEnd: boolean };
+    page.caretAtEnd = false;
+    // Added after the editor's own selectionchange listener, so it runs after the editor has read the selection.
+    const listener = (): void => {
+      const selection = document.getSelection();
+      if (!selection?.isCollapsed || !selection.focusNode || !element.contains(selection.focusNode)) return;
+      const rest = document.createRange();
+      rest.setStart(selection.focusNode, selection.focusOffset);
+      rest.setEnd(element, element.childNodes.length);
+      if (rest.toString() !== "") return;
+      page.caretAtEnd = true;
+      document.removeEventListener("selectionchange", listener);
+    };
+    document.addEventListener("selectionchange", listener);
+  });
+  await target.click();
   await window.keyboard.press("End");
+  await expect
+    .poll(() => window.evaluate(() => (globalThis as unknown as { caretAtEnd: boolean }).caretAtEnd))
+    .toBe(true);
 }
 
 /** Clicks File > Save once and waits for the file at `path` to hold `expected`. */
