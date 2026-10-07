@@ -5,6 +5,11 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app's GitHub theme, View > Theme > GitHub, is now available. It makes a document
+  look as the same file does on github.com: GitHub's text sizes, headings, tables with banded
+  rows, code blocks as a rounded grey panel with GitHub's code colours, and links underlined in
+  blue, in a centred column up to 980 pixels wide. It follows Windows' light or dark mode. Text is
+  in Segoe UI rather than github.com's own web font.
 - The desktop app has a theme setting, View > Theme. The VS Code theme, the default, makes a
   document look as it does in VS Code's Markdown preview: Segoe UI text at 14 pixels, a thin rule
   under first- and second-level headings, quotes as a shaded band with a bar on the left, inline

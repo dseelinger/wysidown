@@ -15,6 +15,7 @@
     "@codemirror/state": "6.7.5",
     "@codemirror/view": "6.43.12",
     "@wysidown/core": "workspace:*",
+    "github-markdown-css": "5.9.0",
     "highlight.js": "11.11.1",
     "lowlight": "3.3.0",
     "prosemirror-commands": "1.7.2",

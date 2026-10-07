@@ -1,5 +1,6 @@
 @import "prosemirror-view/style/prosemirror.css";
 @import "./themes/vscode.css";
+@import "./themes/github.css";
 
 /* Colours come from VS Code's theme variables in the extension and from the system theme elsewhere. */
 :root {

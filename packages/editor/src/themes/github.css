@@ -1,0 +1,183 @@
+/*
+ * The GitHub theme: the look of a markdown file on github.com, from github-markdown-css (MIT, see
+ * NOTICE). Its rules match only under .markdown-body, which the desktop app puts on the editor's
+ * root while body has wysidown-theme-github; the rules below fit them to the editor's markup.
+ */
+@import "github-markdown-css/github-markdown.css";
+
+body.wysidown-theme-github {
+  --wysidown-background: light-dark(#ffffff, #0d1117);
+  --wysidown-foreground: light-dark(#1f2328, #f0f6fc);
+  --wysidown-link: light-dark(#0969da, #4493f8);
+  --wysidown-focus: light-dark(#0969da, #1f6feb);
+  --wysidown-popup-background: light-dark(#ffffff, #151b23);
+  --wysidown-popup-foreground: light-dark(#1f2328, #f0f6fc);
+  --wysidown-popup-border: light-dark(#d1d9e0, #3d444d);
+
+  margin: 0;
+}
+
+/* The standalone layout from the package's README: a centred column. */
+body.wysidown-theme-github > .markdown-body {
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 45px;
+}
+
+@media (max-width: 767px) {
+  body.wysidown-theme-github > .markdown-body {
+    padding: 15px;
+  }
+}
+
+.wysidown-theme-github .ProseMirror {
+  line-height: inherit;
+}
+
+.wysidown-theme-github .ProseMirror > :first-child {
+  margin-top: 0;
+}
+
+.wysidown-theme-github .ProseMirror > :last-child {
+  margin-bottom: 0;
+}
+
+/* The editor's links have no href, which the package styles as plain text. */
+.wysidown-theme-github .ProseMirror a {
+  color: var(--wysidown-link);
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.wysidown-theme-github .markdown-body hr {
+  height: 1px;
+}
+
+/* Header cells are td.header in the first row, where github.com has th in a thead. */
+.wysidown-theme-github .ProseMirror td.header {
+  background: none;
+  text-align: center;
+}
+
+.wysidown-theme-github .markdown-body table tr:nth-child(2n) {
+  background-color: var(--bgColor-default);
+}
+
+.wysidown-theme-github .markdown-body table tr:nth-child(2n + 3) {
+  background-color: var(--bgColor-muted);
+}
+
+/* .code-block takes the place of github.com's div.highlight, its pre the panel. */
+.wysidown-theme-github .ProseMirror .code-block {
+  position: relative;
+  margin: 0 0 16px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.wysidown-theme-github .ProseMirror .code-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 0;
+}
+
+.wysidown-theme-github .ProseMirror .code-block pre {
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  border-radius: 6px;
+  background-color: var(--bgColor-muted);
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-monospace);
+  font-size: 85%;
+  line-height: 1.45;
+}
+
+/* Code tokens in GitHub's syntax colours, mapped onto highlight.js classes as highlight.js's own GitHub theme does. A token it does not name takes the text colour. */
+.wysidown-theme-github .ProseMirror .code-block [class*="hljs-"] {
+  color: inherit;
+}
+
+.wysidown-theme-github .ProseMirror .code-block :is(.hljs-doctag, .hljs-keyword, .hljs-template-tag, .hljs-type) {
+  color: var(--color-prettylights-syntax-keyword);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-title {
+  color: var(--color-prettylights-syntax-entity);
+}
+
+.wysidown-theme-github
+  .ProseMirror
+  .code-block
+  :is(
+    .hljs-attr,
+    .hljs-attribute,
+    .hljs-literal,
+    .hljs-meta,
+    .hljs-number,
+    .hljs-operator,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-selector-attr,
+    .hljs-selector-class,
+    .hljs-selector-id
+  ) {
+  color: var(--color-prettylights-syntax-constant);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-string {
+  color: var(--color-prettylights-syntax-string);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-regexp {
+  color: var(--color-prettylights-syntax-string-regexp);
+}
+
+.wysidown-theme-github .ProseMirror .code-block :is(.hljs-built_in, .hljs-symbol) {
+  color: var(--color-prettylights-syntax-variable);
+}
+
+.wysidown-theme-github .ProseMirror .code-block :is(.hljs-comment, .hljs-code, .hljs-formula) {
+  color: var(--color-prettylights-syntax-comment);
+}
+
+.wysidown-theme-github
+  .ProseMirror
+  .code-block
+  :is(.hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo) {
+  color: var(--color-prettylights-syntax-entity-tag);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-section {
+  color: var(--color-prettylights-syntax-markup-heading);
+  font-weight: bold;
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-bullet {
+  color: var(--color-prettylights-syntax-markup-list);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-emphasis {
+  color: var(--color-prettylights-syntax-markup-italic);
+  font-style: italic;
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-strong {
+  color: var(--color-prettylights-syntax-markup-bold);
+  font-weight: bold;
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-addition {
+  background-color: var(--color-prettylights-syntax-markup-inserted-bg);
+  color: var(--color-prettylights-syntax-markup-inserted-text);
+}
+
+.wysidown-theme-github .ProseMirror .code-block .hljs-deletion {
+  background-color: var(--color-prettylights-syntax-markup-deleted-bg);
+  color: var(--color-prettylights-syntax-markup-deleted-text);
+}

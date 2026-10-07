@@ -4,15 +4,16 @@ import { createEditor, createSourceEditor, type Editor, type SourceEditor } from
 import type {} from "./bridge.ts";
 
 const bridge = window.wysidown;
+const place = document.querySelector<HTMLElement>("#editor")!;
 
 bridge.onTheme((theme) => {
   for (const name of [...document.body.classList]) {
     if (name.startsWith("wysidown-theme-")) document.body.classList.remove(name);
   }
   document.body.classList.add(`wysidown-theme-${theme}`);
+  place.classList.toggle("markdown-body", theme === "github");
 });
 
-const place = document.querySelector<HTMLElement>("#editor")!;
 const post = (message: EditorMessage) => {
   bridge.post(message);
 };

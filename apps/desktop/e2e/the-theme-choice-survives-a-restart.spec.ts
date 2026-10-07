@@ -15,11 +15,11 @@ async function themeItems(app: ElectronApplication): Promise<Record<string, [boo
   });
 }
 
-test("a first run shows the VS Code theme, with GitHub not yet available", async () => {
+test("a first run shows the VS Code theme, with GitHub available to choose", async () => {
   const { app, window, errors } = await launch();
   try {
     await expect(window.locator("body")).toHaveClass("wysidown-theme-vscode");
-    expect(await themeItems(app)).toEqual({ "theme-vscode": [true, true], "theme-github": [false, false] });
+    expect(await themeItems(app)).toEqual({ "theme-vscode": [true, true], "theme-github": [false, true] });
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
@@ -32,9 +32,11 @@ test("the theme chosen from View > Theme is saved and shown again after a restar
   const first = await launch(userDataArgument(folder));
   try {
     await expect(first.window.locator("body")).toHaveClass("wysidown-theme-github");
+    await expect(first.window.locator("#editor")).toHaveClass("markdown-body");
     expect((await themeItems(first.app))["theme-github"]?.[0]).toBe(true);
     await menu(first.app, "theme-vscode");
     await expect(first.window.locator("body")).toHaveClass("wysidown-theme-vscode");
+    await expect(first.window.locator("#editor")).not.toHaveClass("markdown-body");
     await expect
       .poll(() => JSON.parse(readText(join(folder, "settings.json"))) as unknown)
       .toEqual({

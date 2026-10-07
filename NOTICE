@@ -17,3 +17,8 @@ packages/editor/src/themes/vscode.css
   Copyright (c) Microsoft Corporation. Licensed under the MIT License.
   highlight.css includes styles from highlight.js, https://github.com/highlightjs/highlight.js,
   Copyright (c) 2006, Ivan Sagalaev. Licensed under the BSD 3-Clause License.
+
+packages/editor/src/themes/github.css
+  Imports github-markdown-css 5.9.0, https://github.com/sindresorhus/github-markdown-css,
+  Copyright (c) Sindre Sorhus. Licensed under the MIT License. Its styles are extracted from
+  github.com.

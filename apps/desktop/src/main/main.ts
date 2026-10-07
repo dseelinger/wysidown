@@ -279,7 +279,6 @@ function buildMenu(): Menu {
               label: "&GitHub",
               type: "radio",
               checked: settings.theme === "github",
-              enabled: false,
               click: onEditor((editor) => setTheme(editor, "github")),
             },
           ],
