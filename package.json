@@ -19,6 +19,7 @@
     "e2e": "pnpm -r --workspace-concurrency=1 run e2e",
     "package": "pnpm -r --workspace-concurrency=1 run package",
     "gate": "node scripts/gate.mjs",
+    "check": "node scripts/gate.mjs --no-e2e",
     "local": "node scripts/local.mjs",
     "icons": "node scripts/icons.mjs"
   },

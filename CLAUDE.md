@@ -37,6 +37,7 @@ Work is tracked as GitHub issues, taken one at a time. No parallel development; 
 pnpm install
 pnpm test:fast -t "corpus"              # core + editor unit tests, filtered: the working loop
 pnpm vitest run --project core          # one project
+pnpm check                              # the gate without end-to-end tests: opens no windows
 pnpm gate                               # the release gate, local only, no CI
 pnpm local                              # build, package, install the extension into VS Code
 pnpm icons                              # rebuild the app icons from assets/icon.svg (uses Edge)
@@ -47,8 +48,11 @@ install → `prettier --check` → `eslint --max-warnings 0` → `tsc -b` → al
 → end-to-end tests (editor harness in Edge, desktop app in Electron, extension in VS Code) →
 `vsce package` and `electron-builder --dir`.
 
-A session that changes what the editor does ends with `pnpm gate` passing, then `pnpm local`
-(`scripts/local.mjs`). It builds both apps and the desktop installer,
+Every end-to-end test opens a real Edge, Electron or VS Code window, and Windows gives it focus.
+A session that changes what the editor does ends with `pnpm check` passing. It ends with
+`pnpm gate` instead when it changes `apps/desktop`, `apps/vscode` or `packages/editor/harness`,
+the host code that only the end-to-end tests run, and before a release. Then `pnpm local`
+(`scripts/local.mjs`) builds both apps and the desktop installer,
 `apps/desktop/release/Wysidown-Setup-<version>.exe`, runs the installer silently (a per-user install
 in `%LOCALAPPDATA%\Programs\wysidown`), installs `apps/vscode/release/wysidown.vsix` with
 `code --install-extension --force`, and prints the installed app's path and both versions. It stops
