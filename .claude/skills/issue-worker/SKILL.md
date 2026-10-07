@@ -109,7 +109,12 @@ pnpm --filter wysidown e2e
 ```
 
 A change to `apps/desktop` alone runs only the desktop's, and `apps/vscode` alone only the
-extension's. `pnpm gate` is the release gate; it is not run per issue.
+extension's.
+
+When the change alters what a user sees or can do — the changes that get a changelog entry — run
+`pnpm gate` instead of the build and end-to-end commands above. It runs them and every other
+check, so the end-to-end suites still run once. A test-only or tooling change does not run the
+gate.
 
 Warnings are errors throughout: Vite and esbuild fail on a build warning, Vitest fails a test that
 writes `console.warn` or `console.error`, Playwright fails on any console message of either kind.
@@ -276,10 +281,15 @@ The turn where the work lands ends in this order:
 1. Commit.
 2. `/code-review` or `/security-review`, when **Reviews** calls for one, with its findings amended
    into the commit.
-3. Launch the app, when the change needs manual testing.
-4. The spoken done sentence, through `/claude-voice`'s command, unless the voice was turned off. It
+3. `pnpm local`, when the change alters what a user sees or can do, after `pnpm gate` passed. It
+   installs the extension into the maintainer's VS Code, which CLAUDE.md allows. If it stops
+   because `Wysidown.exe` is running or `code` is not on PATH, do not close the app or change
+   PATH; say so in the report.
+4. Launch the app, when the change needs manual testing.
+5. The spoken done sentence, through `/claude-voice`'s command, unless the voice was turned off. It
    is the last tool call of the turn; a sentence left until after the report is not spoken.
-5. The written report, then how to test it.
+6. The written report, then how to test it, and the exe path and extension version `pnpm local`
+   printed.
 
 This applies equally when the work lands on a turn started by a background agent's completion
 notice rather than by the maintainer.

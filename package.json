@@ -18,7 +18,8 @@
     "build": "pnpm -r --workspace-concurrency=1 run build",
     "e2e": "pnpm -r --workspace-concurrency=1 run e2e",
     "package": "pnpm -r --workspace-concurrency=1 run package",
-    "gate": "node scripts/gate.mjs"
+    "gate": "node scripts/gate.mjs",
+    "local": "node scripts/local.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

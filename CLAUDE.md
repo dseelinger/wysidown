@@ -25,7 +25,8 @@ Apply this to comments, commit messages, docstrings, and any prose you write
 
 Keep going when a step needs no input. Stop first before anything that leaves this checkout: a
 push, any GitHub write (issues, comments, labels, releases, pull requests), a Marketplace publish,
-or a file outside the repo. Tool caches (pnpm store, Electron download cache) are the exception.
+or a file outside the repo. Tool caches (pnpm store, Electron download cache) are an exception, and
+so is `pnpm local` installing the built extension into the VS Code on PATH.
 
 Work is tracked as GitHub issues, taken one at a time. No parallel development; commits go to
 `main`.
@@ -37,12 +38,20 @@ pnpm install
 pnpm test:fast -t "corpus"              # core + editor unit tests, filtered: the working loop
 pnpm vitest run --project core          # one project
 pnpm gate                               # the release gate, local only, no CI
+pnpm local                              # build, package, install the extension into VS Code
 ```
 
 `pnpm gate` (`scripts/gate.mjs`) runs, stopping at the first failure: toolchain check → frozen
 install → `prettier --check` → `eslint --max-warnings 0` → `tsc -b` → all Vitest projects → build
 → end-to-end tests (editor harness in Edge, desktop app in Electron, extension in VS Code) →
 `vsce package` and `electron-builder --dir`.
+
+A session that changes what the editor does ends with `pnpm gate` passing, then `pnpm local`
+(`scripts/local.mjs`). It builds and packages both apps, installs
+`apps/vscode/release/wysidown.vsix` with `code --install-extension --force`, and prints the desktop
+app's path, `apps/desktop/release/win-unpacked/Wysidown.exe`, and the extension version installed.
+It stops before building if `Wysidown.exe` is running or `code` is not on PATH. Open VS Code
+windows load the new extension after Developer: Reload Window.
 
 - **Pinned toolchain.** Node `24.13.0` (`.node-version`) and pnpm `12.9.1` (`packageManager`),
   checked exactly by `scripts/check-toolchain.mjs`. Every dependency is pinned to an exact version
@@ -136,5 +145,5 @@ Tests walk up from their own folder to the nearest `pnpm-workspace.yaml` (`test/
 | `packages/editor/`           | The ProseMirror view both hosts load; `harness/` is a browser host for Playwright. |
 | `apps/desktop/`              | Electron app. `src/main` is the main process; `src/renderer` the page.             |
 | `apps/vscode/`               | VS Code extension; `test/` runs inside VS Code via `@vscode/test-cli`.             |
-| `scripts/`                   | `gate.mjs` (the release gate), `check-toolchain.mjs`.                              |
+| `scripts/`                   | `gate.mjs` (the release gate), `local.mjs` (`pnpm local`), `check-toolchain.mjs`.  |
 | `docs/spikes/`               | Spike reports.                                                                     |

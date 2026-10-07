@@ -19,6 +19,11 @@ pnpm gate
 `pnpm gate` runs every check and builds both packages. See `CLAUDE.md` for the full list of
 commands.
 
+`pnpm local` builds and packages both apps, then installs the extension into the VS Code whose
+`code` command is on PATH. It prints where the desktop app is,
+`apps/desktop/release/win-unpacked/Wysidown.exe`, and the extension version it installed. Close
+`Wysidown.exe` first; reload open VS Code windows afterwards.
+
 ## License
 
 MIT. See `LICENSE` and `NOTICE`.
