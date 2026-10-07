@@ -69,7 +69,8 @@ const marks: Record<string, (mark: Mark) => DOMOutputSpec> = {
 
 /**
  * Reads edited content back from the view. The view shows whitespace as it is (`white-space:
- * pre-wrap`), so none is collapsed and a line break inside a paragraph stays a line break.
+ * pre-wrap`) apart from soft line breaks, which show as spaces; none is collapsed when read, so a
+ * soft line break stays `\n`.
  */
 class ShownWhitespaceParser extends DOMParser {
   override parse(dom: Parameters<DOMParser["parse"]>[0], options: ParseOptions = {}): Node {

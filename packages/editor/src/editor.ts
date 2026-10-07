@@ -12,6 +12,7 @@ import { paste } from "./paste.ts";
 import { PastedImages } from "./pasted-images.ts";
 import { domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
+import { softBreaks } from "./soft-breaks.ts";
 import { selectionAtSource, sourceSelectionOf, type SourceSelection } from "./source-selection.ts";
 import { tableKeys, tables } from "./tables.ts";
 
@@ -59,6 +60,7 @@ export function createEditor(
     keymap(baseKeymap),
     tables(),
     highlighting(),
+    softBreaks(),
     paste(pastedImages),
     pastedImages.plugin,
     links((href) => {

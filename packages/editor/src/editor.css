@@ -47,6 +47,11 @@ body {
   line-height: 1.5;
 }
 
+/* A soft line break shows as a space; the rest of the text keeps its spaces. */
+.ProseMirror .soft-break {
+  white-space: normal;
+}
+
 .ProseMirror .raw {
   border: 1px solid color-mix(in srgb, currentcolor 25%, transparent);
   border-radius: 4px;

@@ -5,6 +5,12 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- A paragraph whose lines are wrapped by hand in the file now shows as one paragraph that wraps
+  at the window width, as in VS Code's Markdown preview and on GitHub. Each line break inside a
+  paragraph, heading or list item shows as a space; the arrow keys step over it in one press, and
+  Backspace or Delete at it joins the two lines. The file keeps its line breaks: an edit in one
+  line changes only that line. Hard line breaks (two trailing spaces or a trailing backslash) and
+  code blocks still show their line breaks.
 - Wysidown has its own icon, a purple tile with an upside-down Markdown M and a yellow down
   arrow. It shows on the desktop app's program file, window, taskbar button, Start menu entry and
   installer, and on the extension in VS Code's Extensions view.
