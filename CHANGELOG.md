@@ -5,6 +5,12 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app has a theme setting, View > Theme. The VS Code theme, the default, makes a
+  document look as it does in VS Code's Markdown preview: Segoe UI text at 14 pixels, a thin rule
+  under first- and second-level headings, quotes as a shaded band with a bar on the left, inline
+  code as a monospace chip, code blocks as a padded panel, and code coloured as in the preview.
+  It follows Windows' light or dark mode. The choice is kept when the app restarts. The GitHub
+  theme is listed but not yet available. The VS Code extension's look does not change.
 - A paragraph whose lines are wrapped by hand in the file now shows as one paragraph that wraps
   at the window width, as in VS Code's Markdown preview and on GitHub. Each line break inside a
   paragraph, heading or list item shows as a space; the arrow keys step over it in one press, and

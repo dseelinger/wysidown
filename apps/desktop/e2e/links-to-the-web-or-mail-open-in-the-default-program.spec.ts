@@ -1,26 +1,7 @@
 import { test } from "@playwright/test";
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import {
-  copyFixture,
-  expect,
-  fixture,
-  launch,
-  newFolder,
-  quit,
-  readText,
-  userDataArgument,
-  type Launched,
-} from "./support.ts";
+import { copyFixture, expect, fixture, launch, offline, quit, readText, type Launched } from "./support.ts";
 
 const name = "35-inline-links.md";
-
-/** Settings that keep images from the web off, so that no test reaches the network. */
-function offline(): string {
-  const folder = newFolder();
-  writeFileSync(join(folder, "settings.json"), JSON.stringify({ remoteImages: false }));
-  return userDataArgument(folder);
-}
 
 /** Makes `shell.openExternal` record each address in `globalThis.opened` of the main process instead of opening it. */
 async function recordOpened({ app }: Launched): Promise<void> {

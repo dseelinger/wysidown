@@ -2,6 +2,7 @@
 import type { HostMessage } from "@wysidown/core";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { Bridge } from "./bridge.ts";
+import { isTheme } from "./theme.ts";
 
 const bridge: Bridge = {
   post(message) {
@@ -19,6 +20,13 @@ const bridge: Bridge = {
   onSourceMode(listener) {
     ipcRenderer.on("source-mode", (_event, on: unknown) => {
       listener(on === true);
+    });
+  },
+  onTheme(listener) {
+    const current: unknown = ipcRenderer.sendSync("theme");
+    if (isTheme(current)) listener(current);
+    ipcRenderer.on("theme", (_event, theme: unknown) => {
+      if (isTheme(theme)) listener(theme);
     });
   },
 };

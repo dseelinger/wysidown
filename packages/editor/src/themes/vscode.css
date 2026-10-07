@@ -1,0 +1,332 @@
+/*
+ * The VS Code theme: the look of VS Code 1.140.0's Markdown preview, from its markdown.css and
+ * highlight.css and the webview's default styles (MIT, see NOTICE), with each --vscode-* variable
+ * replaced by its value in Default Light Modern and Default Dark Modern. Applies only under
+ * body.wysidown-theme-vscode, which the desktop app sets.
+ */
+body.wysidown-theme-vscode {
+  --wysidown-background: light-dark(#ffffff, #1f1f1f);
+  --wysidown-foreground: light-dark(#3b3b3b, #cccccc);
+  --wysidown-link: light-dark(#005fb8, #4daafc);
+  --wysidown-focus: light-dark(#005fb8, #0078d4);
+  --wysidown-selection: light-dark(#add6ff, #264f78);
+  --wysidown-popup-background: light-dark(#f8f8f8, #202020);
+  --wysidown-popup-foreground: light-dark(#3b3b3b, #cccccc);
+  --wysidown-popup-border: light-dark(rgba(59, 59, 59, 0.2), rgba(204, 204, 204, 0.2));
+  --theme-rule: light-dark(rgba(0, 0, 0, 0.18), rgba(255, 255, 255, 0.18));
+  --theme-header-rule: light-dark(rgba(0, 0, 0, 0.69), rgba(255, 255, 255, 0.69));
+  --theme-preformat-foreground: light-dark(#3b3b3b, #d0d0d0);
+  --theme-preformat-background: light-dark(rgba(0, 0, 0, 0.12), #3c3c3c);
+  --theme-code-block-background: light-dark(#f8f8f8, #2b2b2b);
+  --theme-widget-border: light-dark(#e5e5e5, #313131);
+  --theme-quote-background: light-dark(#f8f8f8, #2b2b2b);
+  --theme-quote-border: light-dark(#e5e5e5, #616161);
+  --theme-monospace: Consolas, "Courier New", monospace;
+
+  margin: 0;
+  padding: 14px 26px 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.wysidown-theme-vscode .ProseMirror {
+  line-height: inherit;
+}
+
+.wysidown-theme-vscode .ProseMirror :is(h1, h2, h3, h4, h5, h6, p, ol, ul, pre) {
+  margin-top: 0;
+}
+
+.wysidown-theme-vscode .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 16px;
+  line-height: 1.25;
+}
+
+.wysidown-theme-vscode .ProseMirror h1 {
+  font-size: 2em;
+  margin-top: 0;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--theme-rule);
+}
+
+.wysidown-theme-vscode .ProseMirror h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--theme-rule);
+}
+
+.wysidown-theme-vscode .ProseMirror h3 {
+  font-size: 1.25em;
+}
+
+.wysidown-theme-vscode .ProseMirror h4 {
+  font-size: 1em;
+}
+
+.wysidown-theme-vscode .ProseMirror h5 {
+  font-size: 0.875em;
+}
+
+.wysidown-theme-vscode .ProseMirror h6 {
+  font-size: 0.85em;
+}
+
+.wysidown-theme-vscode .ProseMirror p {
+  margin-bottom: 16px;
+}
+
+.wysidown-theme-vscode .ProseMirror li p {
+  margin-bottom: 0.7em;
+}
+
+.wysidown-theme-vscode .ProseMirror :is(ul, ol) {
+  margin-bottom: 0.7em;
+}
+
+.wysidown-theme-vscode .ProseMirror :is(ul, ol) :is(ul, ol):first-child {
+  margin-bottom: 0;
+}
+
+.wysidown-theme-vscode .ProseMirror a {
+  text-decoration: none;
+}
+
+.wysidown-theme-vscode .ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+.wysidown-theme-vscode .ProseMirror hr {
+  border: 0;
+  height: 1px;
+  border-bottom: 1px solid var(--theme-rule);
+}
+
+.wysidown-theme-vscode .ProseMirror table {
+  border-collapse: collapse;
+  margin-bottom: 0.7em;
+}
+
+.wysidown-theme-vscode .ProseMirror td {
+  padding: 5px 10px;
+  border: 0;
+}
+
+.wysidown-theme-vscode .ProseMirror td.header {
+  font-weight: bold;
+  text-align: left;
+  background: none;
+  border-bottom: 1px solid var(--theme-header-rule);
+}
+
+.wysidown-theme-vscode .ProseMirror tr + tr + tr > td {
+  border-top: 1px solid var(--theme-rule);
+}
+
+.wysidown-theme-vscode .ProseMirror blockquote {
+  margin: 0;
+  padding: 0 16px 0 10px;
+  border-left: 5px solid var(--theme-quote-border);
+  border-radius: 2px;
+  background: var(--theme-quote-background);
+}
+
+.wysidown-theme-vscode .ProseMirror code:not(.raw) {
+  padding: 1px 3px;
+  border-radius: 4px;
+  background-color: var(--theme-preformat-background);
+  color: var(--theme-preformat-foreground);
+  font-family: var(--theme-monospace);
+  font-size: 1em;
+  line-height: 1.357em;
+}
+
+.wysidown-theme-vscode .ProseMirror a code:not(.raw) {
+  color: var(--wysidown-link);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block {
+  position: relative;
+  margin: 0 0 1em;
+  border: 1px solid var(--theme-widget-border);
+  border-radius: 3px;
+  background-color: var(--theme-code-block-background);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-bar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  padding: 0;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 1em;
+  white-space: pre-wrap;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block pre code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--wysidown-foreground);
+}
+
+/* Code tokens, from highlight.css: Visual Studio 2015 in dark, Visual Studio in light. A token it does not name takes the text colour. */
+.wysidown-theme-vscode .ProseMirror .code-block [class*="hljs-"] {
+  color: inherit;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-keyword,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-name {
+  color: light-dark(#0000ff, #569cd6);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-literal {
+  color: light-dark(#a31515, #569cd6);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-symbol {
+  color: light-dark(#00b0e8, #569cd6);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-link {
+  color: light-dark(#00b0e8, #569cd6);
+  text-decoration: underline;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-built_in {
+  color: light-dark(#007acc, #4ec9b0);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-type {
+  color: light-dark(#a31515, #4ec9b0);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-number,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-class {
+  color: light-dark(#008000, #b8d7a3);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-string {
+  color: light-dark(#a31515, #d69d85);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-meta-string {
+  color: #d69d85;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-regexp {
+  color: #9a5334;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-template-tag {
+  color: light-dark(#a31515, #9a5334);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-subst {
+  color: light-dark(#2b91af, #dcdcdc);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-function,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-params {
+  color: light-dark(currentcolor, #dcdcdc);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-title {
+  color: light-dark(#808080, #dcdcdc);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-formula {
+  color: #dcdcdc;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-comment,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-quote {
+  color: light-dark(#008000, #57a64a);
+  font-style: italic;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-doctag {
+  color: light-dark(#808080, #608b4e);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-meta,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-meta-keyword {
+  color: light-dark(#2b91af, #9b9b9b);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-tag {
+  color: light-dark(#0000ff, #9b9b9b);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-variable {
+  color: light-dark(#008000, #bd63c5);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-template-variable {
+  color: light-dark(#a31515, #bd63c5);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-attr {
+  color: light-dark(#ff0000, #9cdcfe);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-attribute {
+  color: light-dark(#a31515, #9cdcfe);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-builtin-name {
+  color: light-dark(#007acc, #9cdcfe);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-section {
+  color: light-dark(#a31515, gold);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-bullet {
+  color: light-dark(#00b0e8, #d7ba7d);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-selector-tag {
+  color: light-dark(#0000ff, #d7ba7d);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-selector-id,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-selector-class {
+  color: #d7ba7d;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-selector-attr,
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-selector-pseudo {
+  color: light-dark(#2b91af, #d7ba7d);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-emphasis {
+  font-style: italic;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-strong {
+  font-weight: bold;
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-addition {
+  display: inline-block;
+  width: 100%;
+  background-color: light-dark(rgba(156, 204, 44, 0.25), rgba(156, 204, 44, 0.2));
+  color: rgb(155, 185, 85);
+}
+
+.wysidown-theme-vscode .ProseMirror .code-block .hljs-deletion {
+  display: inline-block;
+  width: 100%;
+  background-color: rgba(255, 0, 0, 0.2);
+  color: rgb(255, 0, 0);
+}

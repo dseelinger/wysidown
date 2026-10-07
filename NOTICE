@@ -9,3 +9,11 @@ packages/core/test/corpus/spec/
   Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License,
   http://creativecommons.org/licenses/by-sa/4.0/. The examples were extracted unchanged
   except that the spec's tab marker (→) was replaced by a tab character.
+
+packages/editor/src/themes/vscode.css
+  Adapted from markdown.css and highlight.css in extensions/markdown-language-features/media,
+  and from the default webview styles in src/vs/workbench/contrib/webview/browser/pre/index.html,
+  of Visual Studio Code 1.140.0, https://github.com/microsoft/vscode.
+  Copyright (c) Microsoft Corporation. Licensed under the MIT License.
+  highlight.css includes styles from highlight.js, https://github.com/highlightjs/highlight.js,
+  Copyright (c) 2006, Ivan Sagalaev. Licensed under the BSD 3-Clause License.

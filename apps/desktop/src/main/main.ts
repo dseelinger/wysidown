@@ -19,7 +19,8 @@ import { pathToFileURL } from "node:url";
 import { HostDocument } from "./document.ts";
 import { savePastedImage } from "./images.ts";
 import { fileScheme, folderOf, linkedAddress, linkedFile, resourcesOf, serveImage, type Folder } from "./resources.ts";
-import { readSettings, writeSettings, type Settings } from "./settings.ts";
+import type { Theme } from "../renderer/theme.ts";
+import { defaults, readSettings, writeSettings, type Settings } from "./settings.ts";
 
 const pageUrl = pathToFileURL(join(__dirname, "renderer", "index.html")).href;
 const markdownExtensions = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "txt"];
@@ -41,7 +42,7 @@ const editors = new Set<Editor>();
 /** The editor whose window was focused last. */
 let lastFocused: Editor | null = null;
 let windowCount = 0;
-let settings: Settings = { remoteImages: true };
+let settings: Settings = { ...defaults };
 
 const settingsPath = (): string => join(app.getPath("userData"), "settings.json");
 
@@ -170,14 +171,29 @@ async function openLinked(editor: Editor, path: string): Promise<void> {
   if (await confirmDiscard(editor)) await open(editor, path);
 }
 
-async function setRemoteImages(editor: Editor, on: boolean): Promise<void> {
-  settings = { ...settings, remoteImages: on };
-  for (const each of editors) each.doc.setResources(resourcesOf(each.folder, on));
+/** Saves the settings, telling the user of `editor` when they cannot be saved. */
+async function saveSettings(editor: Editor): Promise<void> {
   try {
     await writeSettings(settingsPath(), settings);
   } catch (error) {
     await showError(editor, "Wysidown cannot save its settings.", String(error));
   }
+}
+
+async function setRemoteImages(editor: Editor, on: boolean): Promise<void> {
+  settings = { ...settings, remoteImages: on };
+  for (const each of editors) each.doc.setResources(resourcesOf(each.folder, on));
+  await saveSettings(editor);
+}
+
+/** Shows every window in `theme` and saves it as the setting. */
+async function setTheme(editor: Editor, theme: Theme): Promise<void> {
+  settings = { ...settings, theme };
+  for (const each of editors) {
+    const contents = each.win.webContents;
+    if (!contents.isDestroyed()) contents.send("theme", theme);
+  }
+  await saveSettings(editor);
 }
 
 /** Opens a file dropped on the window. `path` comes from the renderer, so only absolute markdown paths are taken. */
@@ -247,6 +263,26 @@ function buildMenu(): Menu {
           type: "checkbox",
           checked: settings.remoteImages,
           click: onEditor(setRemoteImages),
+        },
+        {
+          label: "&Theme",
+          submenu: [
+            {
+              id: "theme-vscode",
+              label: "&VS Code",
+              type: "radio",
+              checked: settings.theme === "vscode",
+              click: onEditor((editor) => setTheme(editor, "vscode")),
+            },
+            {
+              id: "theme-github",
+              label: "&GitHub",
+              type: "radio",
+              checked: settings.theme === "github",
+              enabled: false,
+              click: onEditor((editor) => setTheme(editor, "github")),
+            },
+          ],
         },
       ],
     },
@@ -367,6 +403,11 @@ ipcMain.on("editor-message", (event, message: unknown) => {
   const linked = linkedFile(message, editor.folder);
   if (linked === null) editor.doc.receive(message);
   else void openLinked(editor, linked);
+});
+
+// The page asks for the theme once, before it first draws.
+ipcMain.on("theme", (event) => {
+  event.returnValue = editorOfPage(event.sender, event.senderFrame?.url) ? settings.theme : null;
 });
 
 ipcMain.on("open-file", (event, path: unknown) => {

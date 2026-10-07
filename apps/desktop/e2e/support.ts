@@ -86,6 +86,13 @@ export function userDataArgument(folder: string): string {
   return `--user-data-dir=${folder.replaceAll("\\", "/")}`;
 }
 
+/** The argument that makes the app keep its settings in a new folder, with images from the web turned off so it does not reach the network. */
+export function offline(): string {
+  const folder = newFolder();
+  writeFileSync(join(folder, "settings.json"), JSON.stringify({ remoteImages: false }));
+  return userDataArgument(folder);
+}
+
 export function writeText(path: string, text: string): void {
   writeFileSync(path, text, "utf8");
 }
@@ -97,7 +104,7 @@ export function readText(path: string): string {
 /** Clicks a menu item by its id. */
 export async function menu(
   app: ElectronApplication,
-  id: "open" | "save" | "save-as" | "remote-images" | "source-mode",
+  id: "open" | "save" | "save-as" | "remote-images" | "source-mode" | "theme-vscode" | "theme-github",
 ): Promise<void> {
   await app.evaluate(({ Menu }, itemId) => {
     const item = Menu.getApplicationMenu()!.getMenuItemById(itemId)!;

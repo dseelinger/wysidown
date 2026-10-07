@@ -1,12 +1,15 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { isTheme, type Theme } from "../renderer/theme.ts";
 
 /** Settings kept between runs. */
 export interface Settings {
   /** True when images from the web are loaded. */
   remoteImages: boolean;
+  /** How the document looks. */
+  theme: Theme;
 }
 
-const defaults: Settings = { remoteImages: true };
+export const defaults: Settings = { remoteImages: true, theme: "vscode" };
 
 /** Reads the settings in the JSON file at `path`, taking the default for any that is missing or malformed. */
 export async function readSettings(path: string): Promise<Settings> {
@@ -16,8 +19,11 @@ export async function readSettings(path: string): Promise<Settings> {
   } catch {
     return { ...defaults };
   }
-  const remoteImages = (json as { remoteImages?: unknown } | null)?.remoteImages;
-  return { remoteImages: typeof remoteImages === "boolean" ? remoteImages : defaults.remoteImages };
+  const { remoteImages, theme } = (json ?? {}) as { remoteImages?: unknown; theme?: unknown };
+  return {
+    remoteImages: typeof remoteImages === "boolean" ? remoteImages : defaults.remoteImages,
+    theme: isTheme(theme) ? theme : defaults.theme,
+  };
 }
 
 /** Writes `settings` to the JSON file at `path`. */

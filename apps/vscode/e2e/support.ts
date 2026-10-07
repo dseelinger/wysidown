@@ -51,7 +51,7 @@ export const test = base.extend<{ open: (fixture: string, options?: OpenOptions)
 });
 
 /** The repository root: the nearest ancestor holding pnpm-workspace.yaml. */
-function repoRoot(): string {
+export function repoRoot(): string {
   let dir = import.meta.dirname;
   while (!existsSync(join(dir, "pnpm-workspace.yaml"))) {
     if (dirname(dir) === dir) throw new Error("pnpm-workspace.yaml not found above " + import.meta.dirname);
@@ -61,7 +61,7 @@ function repoRoot(): string {
 }
 
 const extension = join(import.meta.dirname, "..");
-const corpus = join(repoRoot(), "packages", "core", "test", "corpus", "realistic");
+export const corpus = join(repoRoot(), "packages", "core", "test", "corpus", "realistic");
 
 /** A realistic corpus fixture's text. */
 export function fixture(name: string): string {
@@ -73,7 +73,7 @@ export function readText(path: string): string {
 }
 
 /** The VS Code executable the extension-host tests use, at the version `.vscode-test.mjs` names. */
-async function vscodeExecutable(): Promise<string> {
+export async function vscodeExecutable(): Promise<string> {
   const config = (await import(pathToFileURL(join(extension, ".vscode-test.mjs")).href)) as {
     default: { version: string };
   };
