@@ -16,6 +16,11 @@ const bridge: Bridge = {
     const path = webUtils.getPathForFile(file);
     if (path) ipcRenderer.send("open-file", path);
   },
+  onSourceMode(listener) {
+    ipcRenderer.on("source-mode", (_event, on: unknown) => {
+      listener(on === true);
+    });
+  },
 };
 
 contextBridge.exposeInMainWorld("wysidown", bridge);

@@ -5,6 +5,11 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app has a source mode: View > Source Mode, or Ctrl+/, shows the markdown as plain
+  text and switches back again. The cursor and any selection stay on the same text in both
+  directions. Text typed in source mode is saved exactly as typed, a new line takes the file's
+  line ending, and a byte order mark is kept. Undo works within each mode; switching starts a new
+  undo history.
 - Code blocks are coloured by their language: keywords, strings, numbers, comments and similar
   parts of bash, C, C++, C#, CSS, diff, Go, HTML, Java, JavaScript, JSON, JSX, Kotlin, Markdown,
   PHP, PowerShell, Python, Ruby, Rust, SQL, Swift, TOML, TSX, TypeScript, XML and YAML. A block

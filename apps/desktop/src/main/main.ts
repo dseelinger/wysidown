@@ -18,6 +18,8 @@ let doc: HostDocument | null = null;
 let folder: Folder | null = null;
 let settings: Settings = { remoteImages: true };
 let closing = false;
+/** True while the window shows the markdown source in place of the rendered document. */
+let sourceMode = false;
 
 const settingsPath = (): string => join(app.getPath("userData"), "settings.json");
 
@@ -163,6 +165,13 @@ async function openDropped(path: unknown): Promise<void> {
   if (await confirmDiscard()) await open(path);
 }
 
+/** Shows the markdown source, or the rendered document, in the window. */
+function setSourceMode(on: boolean): void {
+  sourceMode = on;
+  const contents = win?.webContents;
+  if (contents && !contents.isDestroyed()) contents.send("source-mode", on);
+}
+
 function buildMenu(): Menu {
   return Menu.buildFromTemplate([
     {
@@ -182,6 +191,17 @@ function buildMenu(): Menu {
     {
       label: "&View",
       submenu: [
+        {
+          id: "source-mode",
+          label: "&Source Mode",
+          type: "checkbox",
+          accelerator: "CmdOrCtrl+/",
+          checked: sourceMode,
+          click: (item) => {
+            setSourceMode(item.checked);
+          },
+        },
+        { type: "separator" },
         {
           id: "remote-images",
           label: "Load &Images from the Web",

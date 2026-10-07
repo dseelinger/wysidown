@@ -25,7 +25,7 @@ test("the page has no Node access and reaches the main process only through the 
     expect(page).toEqual({
       require: "undefined",
       process: "undefined",
-      bridge: ["onMessage", "openFile", "post"],
+      bridge: ["onMessage", "onSourceMode", "openFile", "post"],
       csp: "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' wysidown-file: https: data:; font-src 'self'",
     });
     expect(errors).toEqual([]);

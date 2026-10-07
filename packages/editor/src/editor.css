@@ -7,6 +7,7 @@
   --wysidown-foreground: var(--vscode-editor-foreground, CanvasText);
   --wysidown-link: var(--vscode-textLink-foreground, LinkText);
   --wysidown-focus: var(--vscode-focusBorder, Highlight);
+  --wysidown-selection: var(--vscode-editor-selectionBackground, color-mix(in srgb, Highlight 45%, transparent));
   --wysidown-popup-background: var(--vscode-editorWidget-background, Canvas);
   --wysidown-popup-foreground: var(--vscode-editorWidget-foreground, CanvasText);
   --wysidown-popup-border: var(

@@ -57,6 +57,11 @@ export class Session {
     return this.#source !== null;
   }
 
+  /** The host's text once the edits sent are applied; held typing is not in it. */
+  get text(): string {
+    return this.#sent.at(-1) ?? this.#hostText;
+  }
+
   /** Handles a message from the host. Returns the new state when the message changed it. */
   receive(message: HostMessage): EditorState | null {
     switch (message.type) {

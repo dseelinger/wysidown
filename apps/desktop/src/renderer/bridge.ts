@@ -8,6 +8,8 @@ export interface Bridge {
   onMessage(listener: (message: HostMessage) => void): void;
   /** Asks the host to open a file dropped on the window. */
   openFile(file: File): void;
+  /** Calls `listener` when the host switches between the markdown source (true) and the rendered document. */
+  onSourceMode(listener: (on: boolean) => void): void;
 }
 
 declare global {

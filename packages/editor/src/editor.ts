@@ -12,12 +12,15 @@ import { paste } from "./paste.ts";
 import { PastedImages } from "./pasted-images.ts";
 import { domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
+import { selectionAtSource, sourceSelectionOf, type SourceSelection } from "./source-selection.ts";
 import { tableKeys, tables } from "./tables.ts";
 
 export interface Editor {
   /** Passes a message from the host to the editor. */
   receive(message: HostMessage): void;
   readonly view: EditorView;
+  /** The selection as offsets in the document's source. Sends any held typing first. */
+  sourceSelection(): SourceSelection;
   destroy(): void;
 }
 
@@ -27,6 +30,10 @@ export interface EditorOptions {
    * host, and sends typing a word at a time so that each word is one undo step in the host.
    */
   history?: boolean;
+  /** Source offsets to select when the first document loads, in place of the start of its text. */
+  selection?: SourceSelection;
+  /** True to take the keyboard when the first document loads. */
+  focus?: boolean;
 }
 
 /** Milliseconds typing waits for more typing before it is sent, when the host owns undo. */
@@ -59,6 +66,8 @@ export function createEditor(
     }),
   ];
   let resources: Resources = noResources;
+  let selection = options.selection;
+  let focus = options.focus === true;
   const document = place.ownerDocument;
   const session = new Session(post, plugins, options.history === false ? typingPause : 0);
   const view = new EditorView(place, {
@@ -120,11 +129,27 @@ export function createEditor(
         pastedImages.receive(message);
         return;
       }
-      const state = session.receive(message);
+      let state = session.receive(message);
+      if (state && message.type === "load" && selection) {
+        const selected = selectionAtSource(state, message.text, selection);
+        if (selected) {
+          state = state.apply(state.tr.setSelection(selected).scrollIntoView());
+          session.update(state);
+        }
+        selection = undefined;
+      }
       if (state) props.state = state;
       if (props.state || props.nodeViews) view.setProps(props);
+      if (focus && message.type === "load") {
+        focus = false;
+        view.focus();
+      }
     },
     view,
+    sourceSelection() {
+      session.sendHeld();
+      return sourceSelectionOf(view.state, session.text);
+    },
     destroy() {
       session.sendHeld();
       page?.removeEventListener("keydown", sendHeldBeforeCombination, true);

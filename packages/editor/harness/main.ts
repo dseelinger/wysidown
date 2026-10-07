@@ -1,6 +1,7 @@
-// The browser harness: hosts the editor with an in-memory host, for Playwright. `?undo=host` leaves undo to the host.
+// The browser harness: hosts the editor with an in-memory host, for Playwright. `?undo=host` leaves undo to the host;
+// `?pane=source` shows the source pane in place of the editor.
 import type { EditorMessage, HostMessage } from "@wysidown/core";
-import { createEditor } from "../src/index.ts";
+import { createEditor, createSourceEditor } from "../src/index.ts";
 import type { Harness } from "./api.ts";
 import { MemoryHost } from "./memory-host.ts";
 
@@ -35,13 +36,17 @@ function channel<T extends HostMessage | EditorMessage>(deliver: (message: T) =>
 
 const place = document.querySelector<HTMLElement>("#editor")!;
 const toEditor = channel<HostMessage>((m) => {
-  editor.receive(m);
+  source?.receive(m);
+  editor?.receive(m);
 });
 const host = new MemoryHost(toEditor);
 const toHost = channel<EditorMessage>((m) => {
   host.receive(m);
 });
-const editor = createEditor(place, toHost, { history: new URLSearchParams(location.search).get("undo") !== "host" });
+const params = new URLSearchParams(location.search);
+const sourcePane = params.get("pane") === "source";
+const source = sourcePane ? createSourceEditor(place, toHost) : null;
+const editor = sourcePane ? null : createEditor(place, toHost, { history: params.get("undo") !== "host" });
 
 const harness: Harness = {
   text: () => host.text,
@@ -57,6 +62,7 @@ const harness: Harness = {
     toEditor({ type: "resources", ...resources });
   },
   selectionInSync: () => {
+    if (!editor) return true;
     const { view } = editor;
     const dom = view.dom.ownerDocument.getSelection();
     if (!dom?.focusNode || !view.dom.contains(dom.focusNode)) return false;
