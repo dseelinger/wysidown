@@ -100,7 +100,7 @@ async function openLinked(uri: vscode.Uri): Promise<void> {
 }
 
 /**
- * The webview's page: the editor bundle and its stylesheet, under a CSP that allows nothing else to
+ * The webview's page: the editor bundle and its stylesheet in the VS Code theme, under a CSP that allows nothing else to
  * run, and images only from the webview's resources, `data:` and, when `remote`, the web.
  */
 function page(webview: vscode.Webview, media: vscode.Uri, remote: boolean): string {
@@ -119,7 +119,7 @@ function page(webview: vscode.Webview, media: vscode.Uri, remote: boolean): stri
     <link rel="stylesheet" href="${style}" />
     <title>Wysidown</title>
   </head>
-  <body>
+  <body class="wysidown-theme-vscode">
     <div id="editor"></div>
     <script nonce="${nonce}" src="${script}"></script>
   </body>

@@ -5,6 +5,11 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- In VS Code, Wysidown now looks like VS Code's Markdown preview of the same file: inline code in
+  the editor's monospace font, code blocks as a panel with the language label in its corner, tables
+  with a rule under the header and between rows, quotes with a bar on the left, a rule under
+  first-level headings, and a thin horizontal rule. Colours come from your VS Code colour theme.
+  High contrast themes keep their solid borders.
 - The desktop app's GitHub theme, View > Theme > GitHub, is now available. It makes a document
   look as the same file does on github.com: GitHub's text sizes, headings, tables with banded
   rows, code blocks as a rounded grey panel with GitHub's code colours, and links underlined in

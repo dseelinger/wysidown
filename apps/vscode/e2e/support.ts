@@ -31,6 +31,8 @@ export interface OpenOptions {
   files?: Record<string, string | Uint8Array>;
   /** User settings added to the test's own. */
   settings?: Record<string, unknown>;
+  /** Command-line arguments added to VS Code's own. */
+  args?: string[];
 }
 
 /** A test that opens a copy of a realistic corpus fixture in Wysidown and fails on any error from its webview. */
@@ -121,6 +123,7 @@ async function open(name: string, apps: ElectronApplication[], options: OpenOpti
         "--skip-welcome",
         "--skip-release-notes",
         "--new-window",
+        ...(options.args ?? []),
         folder,
         path,
       ],
