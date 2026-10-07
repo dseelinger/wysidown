@@ -100,6 +100,7 @@ export class Session {
         this.#flush();
         return null;
       case "resources":
+      case "imageSaved":
         return null;
     }
   }

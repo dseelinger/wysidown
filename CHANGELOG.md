@@ -5,6 +5,12 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Pasting an image that is only on the clipboard, such as a screenshot, a picture copied in Word,
+  or an image embedded in copied web content, saves it in an `images` folder beside the markdown
+  file and inserts a link to it, such as `![](images/image-1.png)`. Each pasted image gets a new
+  name (`image-1.png`, `image-2.png`, …), so no file is overwritten. PNG, JPEG, GIF and WebP
+  images are saved. A document that has never been saved cannot take pasted images: save it
+  first. Images copied from a web page keep their web address.
 - Ctrl+click on a link to a web page or an email address, or Open in the link's bubble, opens it
   in your browser or mail program. A reference link opens the address in its definition. Links
   with any other scheme, such as `file:` or `javascript:`, do not open.
@@ -14,8 +20,8 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
   pressed with Ctrl or Alt.
 - Pasting keeps formatting as markdown. Content copied from a web page, Word or Google Docs keeps
   its headings, bold, italic, strikethrough, links, lists (nested and numbered), task lists, code
-  and tables. Word's own formatting and empty lines are dropped. Images that are only on the
-  clipboard, not at a web address, are left out. Links that run script are pasted as plain text.
+  and tables. Word's own formatting and empty lines are dropped. Links that run script are pasted
+  as plain text.
   Text copied from a markdown file in VS Code, or plain text from any program, is read as
   markdown, so `**bold**` pastes as bold. Several lines of code copied from VS Code become a code
   block marked with the file's language. Ctrl+Shift+V pastes text exactly as written, saving

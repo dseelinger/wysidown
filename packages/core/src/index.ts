@@ -16,3 +16,4 @@ export {
 } from "./markdown/tables.ts";
 export { diffText, applyEdits, type TextEdit } from "./text/edits.ts";
 export type { HostMessage, EditorMessage, Resources } from "./host/protocol.ts";
+export { imageExtension, imageFolder, maxImageBytes, saveImageRequest } from "./host/images.ts";

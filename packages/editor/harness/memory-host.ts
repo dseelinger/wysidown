@@ -1,4 +1,4 @@
-import { applyEdits, type EditorMessage, type HostMessage } from "@wysidown/core";
+import { applyEdits, imageExtension, imageFolder, type EditorMessage, type HostMessage } from "@wysidown/core";
 
 /** A host that keeps the document in memory and answers the editor's messages through `send`. */
 export class MemoryHost {
@@ -10,6 +10,10 @@ export class MemoryHost {
   /** The pending `flush` calls, oldest first. */
   #flushes: { id: number; resolve: (text: string) => void }[] = [];
   #lastFlush = 0;
+  /** False when the document has no file, so pasted images are not saved. */
+  hasFolder = true;
+  /** Each pasted image saved, oldest first, with its bytes in base64. */
+  readonly images: { path: string; data: string }[] = [];
 
   constructor(send: (message: HostMessage) => void, text = "") {
     this.#send = send;
@@ -43,6 +47,17 @@ export class MemoryHost {
         this.#text = text;
         this.#version++;
         this.#send({ type: "accepted", version: this.#version });
+        return;
+      }
+      case "saveImage": {
+        const bytes = Uint8Array.from(atob(message.data), (c) => c.charCodeAt(0));
+        const extension = imageExtension(bytes);
+        let path: string | null = null;
+        if (this.hasFolder && extension !== null) {
+          path = `${imageFolder}/image-${String(this.images.length + 1)}.${extension}`;
+          this.images.push({ path, data: message.data });
+        }
+        this.#send({ type: "imageSaved", id: message.id, path });
         return;
       }
       case "flushed":

@@ -62,6 +62,10 @@ const harness: Harness = {
     if (!dom?.focusNode || !view.dom.contains(dom.focusNode)) return false;
     return view.posAtDOM(dom.focusNode, dom.focusOffset) === view.state.selection.head;
   },
+  images: () => host.images,
+  hasFolder: (on) => {
+    host.hasFolder = on;
+  },
   latency: 0,
   messages,
   settled: () => (pending === 0 ? Promise.resolve() : new Promise((resolve) => waiting.push(resolve))),

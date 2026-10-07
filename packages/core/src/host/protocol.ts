@@ -38,7 +38,12 @@ export type HostMessage =
    */
   | { type: "flush"; id: number }
   /** Where the document's images and links now lead. */
-  | ({ type: "resources" } & Resources);
+  | ({ type: "resources" } & Resources)
+  /**
+   * Answers `saveImage`: the saved file's path relative to the document's folder, with `/`; null
+   * when the image was not saved, in which case the host has told the user why.
+   */
+  | { type: "imageSaved"; id: number; path: string | null };
 
 /** Sent by the editor. */
 export type EditorMessage =
@@ -63,4 +68,10 @@ export type EditorMessage =
    * link's target as written, for the host to open the file it names (see `markdownLinkPath`) or,
    * for a scheme in `externalSchemes`, the address. `href` is untrusted.
    */
-  | { type: "open"; href: string };
+  | { type: "open"; href: string }
+  /**
+   * The user pasted an image that is only on the clipboard. `data` is its bytes in base64. The host
+   * saves it under a new name in the `imageFolder` beside the document, never outside the
+   * document's folder, and answers with `imageSaved`. `data` is untrusted (see `saveImageRequest`).
+   */
+  | { type: "saveImage"; id: number; data: string };

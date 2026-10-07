@@ -1,8 +1,10 @@
+import { saveImageRequest, type HostMessage } from "@wysidown/core";
 import { app, BrowserWindow, dialog, ipcMain, Menu, protocol, session, shell, type WebContents } from "electron";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { HostDocument } from "./document.ts";
+import { savePastedImage } from "./images.ts";
 import { fileScheme, folderOf, linkedAddress, linkedFile, resourcesOf, serveImage, type Folder } from "./resources.ts";
 import { readSettings, writeSettings, type Settings } from "./settings.ts";
 
@@ -114,6 +116,31 @@ async function openWithDialog(): Promise<void> {
   if (!result.canceled && path !== undefined) await open(path);
 }
 
+/** Sends `message` to the window's page. */
+function sendToPage(message: HostMessage): void {
+  const contents = win?.webContents;
+  if (contents && !contents.isDestroyed()) contents.send("host-message", message);
+}
+
+/** Saves a pasted image beside the document and tells the page its path, or tells the user why it was not saved. */
+async function savePasted(id: number, data: string): Promise<void> {
+  let path: string | null = null;
+  let problem: string | null = null;
+  if (!folder) {
+    problem = doc?.path
+      ? "Pasted images are not saved beside a document on a network share."
+      : "Save the document first: pasted images are saved in an images folder beside it.";
+  } else {
+    try {
+      path = await savePastedImage(folder.dir, Buffer.from(data, "base64"));
+    } catch (error) {
+      problem = error instanceof Error ? error.message : String(error);
+    }
+  }
+  sendToPage({ type: "imageSaved", id, path });
+  if (problem !== null) await showError("Wysidown cannot paste the image.", problem);
+}
+
 /** Opens the markdown file a link in the document leads to. */
 async function openLinked(path: string): Promise<void> {
   if (await confirmDiscard()) await open(path);
@@ -223,6 +250,11 @@ function createWindow(): void {
 
 ipcMain.on("editor-message", (event, message: unknown) => {
   if (!fromPage(event.sender, event.senderFrame?.url)) return;
+  const image = saveImageRequest(message);
+  if (image !== null) {
+    void savePasted(image.id, image.data);
+    return;
+  }
   const address = linkedAddress(message);
   if (address !== null) {
     shell.openExternal(address).catch((error: unknown) => showError(`Wysidown cannot open ${address}.`, String(error)));

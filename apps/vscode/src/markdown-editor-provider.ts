@@ -1,7 +1,9 @@
+import { saveImageRequest } from "@wysidown/core";
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 import { EditorConnection } from "./editor-connection.ts";
-import { folderOf, linkedAddress, linkedFile, remoteImages, resourcesOf } from "./resources.ts";
+import { savePastedImage } from "./images.ts";
+import { folderOf, linkedAddress, linkedFile, remoteImages, resourcesOf, type Folder } from "./resources.ts";
 
 /** Shows a markdown `TextDocument` in the Wysidown editor, in a webview. */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
@@ -32,6 +34,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       if (message.type === "load") this.#loaded.fire(document);
     });
     const subscription = webview.onDidReceiveMessage((message: unknown) => {
+      const image = saveImageRequest(message);
+      if (image) {
+        return savePasted(document, folder, image.data).then((path) =>
+          webview.postMessage({ type: "imageSaved", id: image.id, path }),
+        );
+      }
       const address = linkedAddress(message);
       if (address) return vscode.env.openExternal(address);
       const linked = linkedFile(message, folder);
@@ -52,6 +60,29 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       saving.dispose();
       connection.dispose();
     });
+  }
+}
+
+/**
+ * Saves a pasted image beside `document`, in `folder`, and returns its path relative to the
+ * document; null when it was not saved, after telling the user why.
+ */
+async function savePasted(document: vscode.TextDocument, folder: Folder | null, data: string): Promise<string | null> {
+  if (!folder) {
+    void vscode.window.showWarningMessage(
+      document.isUntitled
+        ? "Save the document before pasting images: Wysidown saves them in an images folder beside it."
+        : "Wysidown saves pasted images only beside a document on this computer.",
+    );
+    return null;
+  }
+  try {
+    return await savePastedImage(folder.dir, Buffer.from(data, "base64"));
+  } catch (error) {
+    void vscode.window.showErrorMessage(
+      `Wysidown cannot paste the image. ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return null;
   }
 }
 

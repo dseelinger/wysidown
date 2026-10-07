@@ -13,6 +13,10 @@ export interface Harness {
   flush(): Promise<string>;
   /** Tells the editor where images and links lead. */
   resources(resources: Resources): void;
+  /** Each pasted image the host saved, oldest first, with its bytes in base64. */
+  images(): { path: string; data: string }[];
+  /** False to make the host refuse pasted images, as for a document with no file. */
+  hasFolder(on: boolean): void;
   /** Milliseconds each message takes to arrive, in either direction. */
   latency: number;
   /** Every message sent so far, in order. */

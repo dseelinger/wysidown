@@ -1,4 +1,4 @@
-import { parseMarkdown, schema } from "@wysidown/core";
+import { imageExtension, maxImageBytes, parseMarkdown, schema } from "@wysidown/core";
 import {
   DOMParser,
   Fragment,
@@ -7,9 +7,11 @@ import {
   type Node as ProseMirrorNode,
   type ParseOptions,
   type ParseRule,
+  type ResolvedPos,
 } from "prosemirror-model";
 import { Plugin } from "prosemirror-state";
 import type { EditorView } from "prosemirror-view";
+import type { ClipboardImages, PastedImages } from "./pasted-images.ts";
 
 /**
  * Markdown text as document content. A paragraph at the start is open, so it joins the paragraph
@@ -373,12 +375,83 @@ function transformed(view: EditorView, slice: Slice): Slice {
   return result;
 }
 
+const imageTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+
+/** Base64 of `bytes`. */
+function base64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let k = 0; k < bytes.length; k += 0x8000) binary += String.fromCharCode(...bytes.subarray(k, k + 0x8000));
+  return btoa(binary);
+}
+
+/** The base64 bytes of the image `file`; null when it is too large or not a PNG, JPEG, GIF or WebP image. */
+async function fileData(file: File): Promise<string | null> {
+  if (file.size > maxImageBytes) return null;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  return imageExtension(bytes) === null ? null : base64(bytes);
+}
+
+/** The base64 bytes in a `data:` URL of a PNG, JPEG, GIF or WebP image; null for any other `src`. */
+function dataUrlData(src: string): string | null {
+  const m = /^data:image\/(?:png|jpeg|gif|webp);base64,([A-Za-z0-9+/=\s]*)$/i.exec(src.trim());
+  if (!m) return null;
+  const data = m[1]!.replace(/\s/g, "");
+  if (data.length % 4 !== 0 || data.length > Math.ceil(maxImageBytes / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+    return null;
+  }
+  const head = Uint8Array.from(atob(data.slice(0, 16)), (c) => c.charCodeAt(0));
+  return imageExtension(head) === null ? null : data;
+}
+
+/**
+ * The images on `data` that are only on the clipboard, with the content to paste around them: an
+ * image with no HTML (a screenshot), images in HTML whose source is a `data:` URL, or the image
+ * beside HTML that holds nothing but one image with a local source (a picture copied in Word).
+ * Null when there are none.
+ */
+export function clipboardImages(data: DataTransfer, context: ResolvedPos): ClipboardImages | null {
+  const files = Array.from(data.files).filter((f) => imageTypes.includes(f.type));
+  const html = data.getData("text/html");
+  const sources = new Map<string, Promise<string | null>>();
+  const token = () => `wysidown-pasted:${crypto.randomUUID()}`;
+  if (html === "") {
+    if (files.length === 0) return null;
+    const images = files.map((file) => {
+      const src = token();
+      sources.set(src, fileData(file));
+      return schema.nodes.image.create({ src, alt: "" });
+    });
+    return { slice: new Slice(Fragment.from(schema.nodes.paragraph.create(null, images)), 1, 1), sources };
+  }
+  // The editor's own copies keep their images' sources.
+  if (html.includes("data-pm-slice")) return null;
+  const body = new window.DOMParser().parseFromString(withoutStyles(html), "text/html").body;
+  const images = Array.from(body.querySelectorAll("img[src]"));
+  for (const image of images) {
+    const imageData = dataUrlData(image.getAttribute("src") ?? "");
+    if (imageData === null) continue;
+    const src = token();
+    sources.set(src, Promise.resolve(imageData));
+    image.setAttribute("src", src);
+  }
+  const [only] = images;
+  const file = files.length === 1 ? files[0] : undefined;
+  if (only && file && images.length === 1 && sources.size === 0 && body.textContent.trim() === "") {
+    if (/^\s*(file|blob|cid):/i.test(only.getAttribute("src") ?? "")) {
+      const src = token();
+      sources.set(src, fileData(file));
+      only.setAttribute("src", src);
+    }
+  }
+  return sources.size === 0 ? null : { slice: clipboardParser.parseSlice(body, { context }), sources };
+}
+
 /**
  * Pasted text is read as markdown, and taken literally with Ctrl+Shift+V. HTML is converted to
  * the document's nodes; text from a VS Code editor is pasted as markdown, code or text by its
- * language.
+ * language. Images only on the clipboard are saved by the host through `images`.
  */
-export function paste(): Plugin {
+export function paste(images: PastedImages): Plugin {
   let plain = false;
   return new Plugin({
     props: {
@@ -401,7 +474,12 @@ export function paste(): Plugin {
         plain = false;
         if (wasPlain || !event.clipboardData || view.state.selection.$from.parent.type.spec.code) return false;
         const slice = vscodeSlice(event.clipboardData);
-        if (!slice) return false;
+        if (!slice) {
+          const withImages = clipboardImages(event.clipboardData, view.state.selection.$from);
+          if (!withImages) return false;
+          images.paste(view, { ...withImages, slice: transformed(view, withImages.slice) });
+          return true;
+        }
         view.dispatch(
           view.state.tr
             .replaceSelection(transformed(view, slice))

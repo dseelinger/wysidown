@@ -8,6 +8,7 @@ import { noResources } from "./images.ts";
 import { links } from "./links.ts";
 import { listKeys } from "./lists.ts";
 import { paste } from "./paste.ts";
+import { PastedImages } from "./pasted-images.ts";
 import { domParser, serializer, views } from "./render.ts";
 import { Session } from "./session.ts";
 import { tableKeys, tables } from "./tables.ts";
@@ -41,6 +42,7 @@ export function createEditor(
 ): Editor {
   const undoable =
     options.history === false ? [] : [history(), keymap({ "Mod-z": undo, "Mod-y": redo, "Shift-Mod-z": redo })];
+  const pastedImages = new PastedImages(post);
   const plugins = [
     ...undoable,
     keymap(tableKeys),
@@ -48,7 +50,8 @@ export function createEditor(
     keymap(listKeys),
     keymap(baseKeymap),
     tables(),
-    paste(),
+    paste(pastedImages),
+    pastedImages.plugin,
     links((href) => {
       post({ type: "open", href });
     }),
@@ -110,6 +113,10 @@ export function createEditor(
       ) {
         resources = { base: next.base, root: next.root, remoteImages: next.remoteImages };
         props.nodeViews = views(document, () => resources).nodeViews;
+      }
+      if (message.type === "imageSaved") {
+        pastedImages.receive(message);
+        return;
       }
       const state = session.receive(message);
       if (state) props.state = state;
