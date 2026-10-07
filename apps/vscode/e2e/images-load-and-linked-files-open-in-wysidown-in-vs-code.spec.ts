@@ -43,8 +43,15 @@ test("images beside the file load, and images from the web are placeholders whil
 test("Ctrl+click on a link to another markdown file opens it in Wysidown", async ({ open }) => {
   const o = await open(name, { files, settings: { "wysidown.remoteImages": false } });
   await o.editor.locator("a", { hasText: "installation guide" }).click({ modifiers: ["Control"] });
+  /** A frame VS Code detaches between listing and counting counts as not showing the text. */
   const shows = async (text: string) => {
-    for (const frame of await editorFrames(o.window)) if ((await frame.getByText(text).count()) > 0) return true;
+    for (const frame of await editorFrames(o.window)) {
+      const count = await frame
+        .getByText(text)
+        .count()
+        .catch(() => 0);
+      if (count > 0) return true;
+    }
     return false;
   };
   await expect.poll(() => shows("Run the installer."), { timeout: 15000 }).toBe(true);
