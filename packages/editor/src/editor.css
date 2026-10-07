@@ -1,5 +1,46 @@
 @import "prosemirror-view/style/prosemirror.css";
 
+/* Colours come from VS Code's theme variables in the extension and from the system theme elsewhere. */
+:root {
+  color-scheme: light dark;
+  --wysidown-background: var(--vscode-editor-background, Canvas);
+  --wysidown-foreground: var(--vscode-editor-foreground, CanvasText);
+  --wysidown-link: var(--vscode-textLink-foreground, LinkText);
+  --wysidown-focus: var(--vscode-focusBorder, Highlight);
+  --wysidown-popup-background: var(--vscode-editorWidget-background, Canvas);
+  --wysidown-popup-foreground: var(--vscode-editorWidget-foreground, CanvasText);
+  --wysidown-popup-border: var(
+    --vscode-editorWidget-border,
+    color-mix(in srgb, var(--wysidown-popup-foreground) 25%, transparent)
+  );
+  --wysidown-input-background: var(--vscode-input-background, Canvas);
+  --wysidown-input-foreground: var(--vscode-input-foreground, CanvasText);
+  --wysidown-input-border: var(
+    --vscode-input-border,
+    color-mix(in srgb, var(--wysidown-popup-foreground) 30%, transparent)
+  );
+  --wysidown-hover: var(
+    --vscode-list-hoverBackground,
+    color-mix(in srgb, var(--wysidown-popup-foreground) 10%, transparent)
+  );
+  --wysidown-shadow: var(--vscode-widget-shadow, color-mix(in srgb, var(--wysidown-popup-foreground) 20%, transparent));
+}
+
+body.vscode-light,
+body.vscode-high-contrast-light {
+  color-scheme: light;
+}
+
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--wysidown-background);
+  color: var(--wysidown-foreground);
+}
+
 .ProseMirror {
   outline: none;
   line-height: 1.5;
@@ -101,7 +142,7 @@
 }
 
 .ProseMirror .image.ProseMirror-selectednode img {
-  outline: 2px solid Highlight;
+  outline: 2px solid var(--wysidown-focus);
 }
 
 .ProseMirror .image[data-placeholder] {
@@ -143,11 +184,11 @@
   flex-direction: column;
   min-width: 12em;
   padding: 0.25em 0;
-  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border: 1px solid var(--wysidown-popup-border);
   border-radius: 4px;
-  background: Canvas;
-  color: CanvasText;
-  box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 20%, transparent);
+  background: var(--wysidown-popup-background);
+  color: var(--wysidown-popup-foreground);
+  box-shadow: 0 2px 8px var(--wysidown-shadow);
   font:
     0.9em system-ui,
     sans-serif;
@@ -169,7 +210,7 @@
 
 .table-menu button:hover:enabled,
 .table-menu button:focus-visible {
-  background: color-mix(in srgb, CanvasText 10%, transparent);
+  background: var(--wysidown-hover);
   outline: none;
 }
 
@@ -182,11 +223,11 @@
   width: 100%;
   margin: 0.25em 0;
   border: 0;
-  border-top: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  border-top: 1px solid var(--wysidown-popup-border);
 }
 
 .ProseMirror a {
-  color: LinkText;
+  color: var(--wysidown-link);
   text-decoration: underline;
   cursor: text;
 }
@@ -196,11 +237,11 @@
   z-index: 10;
   max-width: min(32em, calc(100vw - 1em));
   padding: 0.3em 0.5em;
-  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border: 1px solid var(--wysidown-popup-border);
   border-radius: 4px;
-  background: Canvas;
-  color: CanvasText;
-  box-shadow: 0 2px 8px color-mix(in srgb, CanvasText 20%, transparent);
+  background: var(--wysidown-popup-background);
+  color: var(--wysidown-popup-foreground);
+  box-shadow: 0 2px 8px var(--wysidown-shadow);
   font:
     0.9em system-ui,
     sans-serif;
@@ -226,7 +267,7 @@
 
 .link-popover button {
   padding: 0.15em 0.6em;
-  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border: 1px solid var(--wysidown-popup-border);
   border-radius: 3px;
   background: none;
   color: inherit;
@@ -236,7 +277,7 @@
 
 .link-popover button:hover,
 .link-popover button:focus-visible {
-  background: color-mix(in srgb, CanvasText 10%, transparent);
+  background: var(--wysidown-hover);
   outline: none;
 }
 
@@ -254,9 +295,49 @@
 .link-form input {
   min-width: 20em;
   padding: 0.15em 0.3em;
-  border: 1px solid color-mix(in srgb, CanvasText 30%, transparent);
+  border: 1px solid var(--wysidown-input-border);
   border-radius: 3px;
-  background: Canvas;
-  color: inherit;
+  background: var(--wysidown-input-background);
+  color: var(--wysidown-input-foreground);
   font: inherit;
+}
+
+/* High contrast: solid borders and focus outlines, from VS Code's contrast colours or the system's. */
+body.vscode-high-contrast {
+  --wysidown-popup-border: var(--vscode-contrastBorder);
+  --wysidown-input-border: var(--vscode-contrastBorder);
+  --wysidown-focus: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder));
+}
+
+body.vscode-high-contrast .ProseMirror .raw,
+body.vscode-high-contrast .ProseMirror .code-block,
+body.vscode-high-contrast .ProseMirror .image[data-placeholder] {
+  border-color: var(--vscode-contrastBorder);
+}
+
+body.vscode-high-contrast .ProseMirror code:not(.raw) {
+  border: 1px solid var(--vscode-contrastBorder);
+  background: none;
+  color: inherit;
+}
+
+@media (forced-colors: active) {
+  :root {
+    --wysidown-popup-border: CanvasText;
+    --wysidown-input-border: CanvasText;
+    --wysidown-focus: Highlight;
+  }
+
+  .ProseMirror .raw,
+  .ProseMirror .code-block,
+  .ProseMirror .image[data-placeholder] {
+    border-color: CanvasText;
+  }
+
+  .table-menu button:hover:enabled,
+  .table-menu button:focus-visible,
+  .link-popover button:hover,
+  .link-popover button:focus-visible {
+    outline: 1px solid Highlight;
+  }
 }

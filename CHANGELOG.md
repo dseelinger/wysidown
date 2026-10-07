@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The editor follows your theme. The desktop app is light or dark with the Windows setting, and
+  a Windows contrast theme gives solid borders in its own colours. In VS Code the page, text,
+  links, the link bubble and the table menu use the colours of the current colour theme, and the
+  high contrast themes give solid borders and inline code without a filled background.
 - Pasting an image that is only on the clipboard, such as a screenshot, a picture copied in Word,
   or an image embedded in copied web content, saves it in an `images` folder beside the markdown
   file and inserts a link to it, such as `![](images/image-1.png)`. Each pasted image gets a new
