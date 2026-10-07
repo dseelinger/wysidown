@@ -7,3 +7,4 @@ packages/core/test/corpus/
 **/.vscode-test/
 **/test-results/
 **/playwright-report/
+.claude/worktrees/
