@@ -39,6 +39,7 @@ pnpm test:fast -t "corpus"              # core + editor unit tests, filtered: th
 pnpm vitest run --project core          # one project
 pnpm gate                               # the release gate, local only, no CI
 pnpm local                              # build, package, install the extension into VS Code
+pnpm icons                              # rebuild the app icons from assets/icon.svg (uses Edge)
 ```
 
 `pnpm gate` (`scripts/gate.mjs`) runs, stopping at the first failure: toolchain check → frozen
@@ -151,3 +152,4 @@ Tests walk up from their own folder to the nearest `pnpm-workspace.yaml` (`test/
 | `apps/vscode/`               | VS Code extension; `test/` runs inside VS Code via `@vscode/test-cli`.             |
 | `scripts/`                   | `gate.mjs` (the release gate), `local.mjs` (`pnpm local`), `check-toolchain.mjs`.  |
 | `docs/spikes/`               | Spike reports.                                                                     |
+| `assets/icon.svg`            | The icon source for both apps; `pnpm icons` rebuilds their `.ico` and `.png`.      |

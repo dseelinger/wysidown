@@ -5,6 +5,9 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Wysidown has its own icon, a purple tile with an upside-down Markdown M and a yellow down
+  arrow. It shows on the desktop app's program file, window, taskbar button, Start menu entry and
+  installer, and on the extension in VS Code's Extensions view.
 - The desktop app has a Windows installer, `Wysidown-Setup-0.1.0.exe`. It installs for your
   account only, without asking for administrator rights, adds Wysidown to the Start menu, and can
   be removed from Settings > Apps. Wysidown is listed under Open with for `.md` and `.markdown`

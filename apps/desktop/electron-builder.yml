@@ -5,6 +5,7 @@ extraMetadata:
   productName: Wysidown
 directories:
   output: release
+  buildResources: build
 files:
   - dist/**/*
   - package.json
@@ -15,6 +16,7 @@ fileAssociations:
     role: Editor
 win:
   target: nsis
+  icon: build/icon.ico
 nsis:
   oneClick: true
   perMachine: false

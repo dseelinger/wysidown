@@ -3,5 +3,6 @@
 !dist/webview/webview.js
 !dist/webview/editor.css
 !package.json
+!icon.png
 !README.md
 !LICENSE
