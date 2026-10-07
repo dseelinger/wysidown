@@ -292,6 +292,89 @@ body {
   display: contents;
 }
 
+/* Code tokens: VS Code's symbol colours in the extension, fixed light and dark colours elsewhere. */
+.ProseMirror .code-block {
+  --token-keyword: var(--vscode-symbolIcon-keywordForeground, light-dark(#0000ff, #569cd6));
+  --token-string: var(--vscode-symbolIcon-stringForeground, light-dark(#a31515, #ce9178));
+  --token-number: var(--vscode-symbolIcon-numberForeground, light-dark(#098658, #b5cea8));
+  --token-function: var(--vscode-symbolIcon-functionForeground, light-dark(#795e26, #dcdcaa));
+  --token-type: var(--vscode-symbolIcon-classForeground, light-dark(#267f99, #4ec9b0));
+  --token-variable: var(--vscode-symbolIcon-variableForeground, light-dark(#001080, #9cdcfe));
+  --token-added: light-dark(#116329, #7ee787);
+  --token-removed: light-dark(#a31515, #ff7b72);
+}
+
+.ProseMirror .code-block .hljs-keyword,
+.ProseMirror .code-block .hljs-literal,
+.ProseMirror .code-block .hljs-selector-tag,
+.ProseMirror .code-block .hljs-doctag,
+.ProseMirror .code-block .hljs-name,
+.ProseMirror .code-block .hljs-tag {
+  color: var(--token-keyword);
+}
+
+.ProseMirror .code-block .hljs-string,
+.ProseMirror .code-block .hljs-regexp,
+.ProseMirror .code-block .hljs-symbol,
+.ProseMirror .code-block .hljs-selector-attr,
+.ProseMirror .code-block .hljs-selector-pseudo {
+  color: var(--token-string);
+}
+
+.ProseMirror .code-block .hljs-number,
+.ProseMirror .code-block .hljs-bullet,
+.ProseMirror .code-block .hljs-link {
+  color: var(--token-number);
+}
+
+.ProseMirror .code-block .hljs-title,
+.ProseMirror .code-block .hljs-section,
+.ProseMirror .code-block .hljs-built_in {
+  color: var(--token-function);
+}
+
+.ProseMirror .code-block .hljs-type,
+.ProseMirror .code-block .hljs-class,
+.ProseMirror .code-block .hljs-selector-class,
+.ProseMirror .code-block .hljs-selector-id {
+  color: var(--token-type);
+}
+
+.ProseMirror .code-block .hljs-attr,
+.ProseMirror .code-block .hljs-attribute,
+.ProseMirror .code-block .hljs-variable,
+.ProseMirror .code-block .hljs-params,
+.ProseMirror .code-block .hljs-property,
+.ProseMirror .code-block .hljs-template-variable {
+  color: var(--token-variable);
+}
+
+.ProseMirror .code-block .hljs-meta {
+  color: var(--token-keyword);
+}
+
+.ProseMirror .code-block .hljs-comment,
+.ProseMirror .code-block .hljs-quote {
+  color: color-mix(in srgb, currentcolor 60%, transparent);
+  font-style: italic;
+}
+
+.ProseMirror .code-block .hljs-addition {
+  color: var(--token-added);
+}
+
+.ProseMirror .code-block .hljs-deletion {
+  color: var(--token-removed);
+}
+
+.ProseMirror .code-block .hljs-emphasis {
+  font-style: italic;
+}
+
+.ProseMirror .code-block .hljs-strong {
+  font-weight: bold;
+}
+
 .link-form input {
   min-width: 20em;
   padding: 0.15em 0.3em;
@@ -332,6 +415,10 @@ body.vscode-high-contrast .ProseMirror code:not(.raw) {
   .ProseMirror .code-block,
   .ProseMirror .image[data-placeholder] {
     border-color: CanvasText;
+  }
+
+  .ProseMirror .code-block [class^="hljs-"] {
+    color: inherit;
   }
 
   .table-menu button:hover:enabled,

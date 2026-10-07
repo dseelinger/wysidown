@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@wysidown/core": "workspace:*",
+    "highlight.js": "11.11.1",
+    "lowlight": "3.3.0",
     "prosemirror-commands": "1.7.2",
     "prosemirror-history": "1.5.1",
     "prosemirror-keymap": "1.2.3",

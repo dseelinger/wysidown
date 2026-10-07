@@ -4,6 +4,7 @@ import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { EditorView, type DirectEditorProps } from "prosemirror-view";
 import { codeKeys } from "./code.ts";
+import { highlighting } from "./highlight.ts";
 import { noResources } from "./images.ts";
 import { links } from "./links.ts";
 import { listKeys } from "./lists.ts";
@@ -50,6 +51,7 @@ export function createEditor(
     keymap(listKeys),
     keymap(baseKeymap),
     tables(),
+    highlighting(),
     paste(pastedImages),
     pastedImages.plugin,
     links((href) => {

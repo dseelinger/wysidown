@@ -5,6 +5,11 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Code blocks are coloured by their language: keywords, strings, numbers, comments and similar
+  parts of bash, C, C++, C#, CSS, diff, Go, HTML, Java, JavaScript, JSON, JSX, Kotlin, Markdown,
+  PHP, PowerShell, Python, Ruby, Rust, SQL, Swift, TOML, TSX, TypeScript, XML and YAML. A block
+  with no language, or one the editor does not know, stays plain. The colours follow the light or
+  dark theme, and in a high contrast theme the text keeps its one colour. The file is not changed.
 - The editor follows your theme. The desktop app is light or dark with the Windows setting, and
   a Windows contrast theme gives solid borders in its own colours. In VS Code the page, text,
   links, the link bubble and the table menu use the colours of the current colour theme, and the
