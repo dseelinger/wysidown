@@ -10,6 +10,7 @@ import {
 import { Fragment, type Node } from "prosemirror-model";
 import { EditorState, Selection, type Plugin, type Transaction } from "prosemirror-state";
 import { ReplaceStep } from "prosemirror-transform";
+import { composing, endsComposition } from "./composition.ts";
 import { fromHost, keepReferencedDefinitions } from "./definitions.ts";
 import { keepATextblock, shown, written } from "./empty-document.ts";
 
@@ -18,6 +19,7 @@ import { keepATextblock, shown, written } from "./empty-document.ts";
  * the host's text and sends each change as an edit, computed against the text the edits already in
  * flight produce. Typing is held for `hold` milliseconds after the last keystroke, so that a word
  * reaches the host as one edit; every other change is sent straight away, with any held typing.
+ * Text being composed is held until the composition ends, whatever `hold` is.
  */
 export class Session {
   readonly #post: (message: EditorMessage) => void;
@@ -117,6 +119,13 @@ export class Session {
   update(state: EditorState, tr?: Transaction): void {
     const before = this.#state;
     this.#state = state;
+    if (tr && composing(state)) {
+      if (tr.docChanged) this.#beforeHeld ??= before;
+      clearTimeout(this.#timer);
+      this.#timer = undefined;
+      return;
+    }
+    if (tr && endsComposition(tr)) return;
     if (this.#hold > 0 && tr && !tr.docChanged && !tr.selectionSet) return;
     if (this.#hold > 0 && tr && typing(tr)) {
       if (startsWord(tr)) {
@@ -125,16 +134,28 @@ export class Session {
       } else {
         this.#beforeHeld ??= before;
       }
-      clearTimeout(this.#timer);
-      this.#timer = setTimeout(() => {
-        this.#flush();
-      }, this.#hold);
+      this.#holdTyping();
       return;
     }
     this.#flush();
   }
 
-  /** True while typing is held. */
+  /** Sends text held while a composition was open, or holds it as typing when typing is held. */
+  composed(): void {
+    if (!this.holding) return;
+    if (this.#hold > 0) this.#holdTyping();
+    else this.#flush();
+  }
+
+  /** Sends held typing once `hold` milliseconds pass with no more typing. */
+  #holdTyping(): void {
+    clearTimeout(this.#timer);
+    this.#timer = setTimeout(() => {
+      this.#flush();
+    }, this.#hold);
+  }
+
+  /** True while typing or composed text is held. */
   get holding(): boolean {
     return this.#beforeHeld !== null;
   }

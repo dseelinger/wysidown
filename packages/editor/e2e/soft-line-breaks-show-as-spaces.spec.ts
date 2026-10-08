@@ -1,39 +1,9 @@
 import type { Page } from "@playwright/test";
-import { expect, fixture, hostText, inSync, load, settled, test } from "./support.ts";
+import { caretAt, expect, fixture, hostText, load, settled, test } from "./support.ts";
 
 const blog = fixture("27-blog-post.md");
 const firstLine = "Open a document,";
 const wrapped = blog.slice(blog.indexOf("Most WYSIWYG"), blog.indexOf("\n\nThat makes"));
-
-/**
- * Places the caret `offset` characters after the start of `text` in the editor's DOM, or selects
- * the `length` characters from there. ProseMirror puts its own selection back over one set in
- * the first few milliseconds after it focuses or updates, so this waits that out first and
- * resolves once the editor has the selection.
- */
-async function caretAt(page: Page, text: string, offset: number, length = 0): Promise<void> {
-  await page.evaluate(() => {
-    document.querySelector<HTMLElement>(".ProseMirror")!.focus();
-  });
-  await page.waitForTimeout(100);
-  await page.evaluate(
-    ([t, o, l]) => {
-      const root = document.querySelector(".ProseMirror")!;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const i = node.textContent!.indexOf(t);
-        if (i < 0) continue;
-        getSelection()!.setBaseAndExtent(node, i + o, node, i + o + l);
-        return;
-      }
-      throw new Error(`"${t}" is not in one text node`);
-    },
-    [text, offset, length] as const,
-  );
-  await inSync(page);
-  await page.waitForTimeout(100);
-  await inSync(page);
-}
 
 /** The height of the editor's paragraph that starts with `start`. */
 async function paragraphHeight(page: Page, start: string): Promise<number> {

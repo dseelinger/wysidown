@@ -5,6 +5,7 @@ import { keymap } from "prosemirror-keymap";
 import type { EditorState } from "prosemirror-state";
 import { EditorView, type DirectEditorProps } from "prosemirror-view";
 import { codeKeys } from "./code.ts";
+import { composing, composition, endsComposition } from "./composition.ts";
 import { DocumentFind } from "./document-find.ts";
 import type { FindTarget } from "./find.ts";
 import { highlighting } from "./highlight.ts";
@@ -69,6 +70,7 @@ export function createEditor(
     },
   });
   const plugins = [
+    composition(),
     ...undoable,
     keymap(tableKeys),
     keymap(codeKeys),
@@ -85,6 +87,9 @@ export function createEditor(
     }),
   ];
   let resources: Resources = noResources;
+  // Host messages that arrive during a composition wait for it to end, in order: redrawing the
+  // document would end the composition, and the composed text is sent only once it is committed.
+  const deferred: HostMessage[] = [];
   let selection = options.selection;
   let focus = options.focus === true;
   const document = place.ownerDocument;
@@ -99,6 +104,10 @@ export function createEditor(
       const state = view.state.apply(tr);
       view.updateState(state);
       session.update(state, tr);
+      if (endsComposition(tr)) {
+        for (const message of deferred.splice(0)) apply(message);
+        session.composed();
+      }
     },
   });
   // Held typing is sent before a key combination reaches the host and before the page loses the
@@ -109,7 +118,7 @@ export function createEditor(
     session.sendHeld();
   };
   const sendHeldBeforeCombination = (event: KeyboardEvent) => {
-    if (!event.ctrlKey && !event.altKey && !event.metaKey) return;
+    if (event.isComposing || (!event.ctrlKey && !event.altKey && !event.metaKey)) return;
     if (["Control", "Alt", "AltGraph", "Meta", "Shift"].includes(event.key)) return;
     const key = event.key.toLowerCase();
     const command = (event.ctrlKey || event.metaKey) && !event.altKey;
@@ -130,39 +139,43 @@ export function createEditor(
   page?.addEventListener("blur", sendHeld);
   page?.addEventListener("pagehide", sendHeld);
   document.addEventListener("visibilitychange", sendHeld);
+  const apply = (message: HostMessage) => {
+    // New resources and a new document are drawn together, so the old document's images are not
+    // requested from the new folder.
+    const props: Partial<DirectEditorProps> = {};
+    const next = message.type === "resources" ? message : message.type === "load" ? message.resources : undefined;
+    if (
+      next &&
+      (next.base !== resources.base || next.root !== resources.root || next.remoteImages !== resources.remoteImages)
+    ) {
+      resources = { base: next.base, root: next.root, remoteImages: next.remoteImages };
+      props.nodeViews = views(document, () => resources).nodeViews;
+    }
+    if (message.type === "imageSaved") {
+      pastedImages.receive(message);
+      return;
+    }
+    let state = session.receive(message);
+    if (state && message.type === "load" && selection) {
+      const selected = selectionAtSource(state, message.text, selection);
+      if (selected) {
+        state = state.apply(state.tr.setSelection(selected).scrollIntoView());
+        session.update(state);
+      }
+      selection = undefined;
+    }
+    if (state) props.state = state;
+    if (props.state || props.nodeViews) view.setProps(props);
+    if (focus && message.type === "load") {
+      focus = false;
+      view.focus();
+    }
+  };
   post({ type: "ready" });
   return {
     receive(message) {
-      // New resources and a new document are drawn together, so the old document's images are not
-      // requested from the new folder.
-      const props: Partial<DirectEditorProps> = {};
-      const next = message.type === "resources" ? message : message.type === "load" ? message.resources : undefined;
-      if (
-        next &&
-        (next.base !== resources.base || next.root !== resources.root || next.remoteImages !== resources.remoteImages)
-      ) {
-        resources = { base: next.base, root: next.root, remoteImages: next.remoteImages };
-        props.nodeViews = views(document, () => resources).nodeViews;
-      }
-      if (message.type === "imageSaved") {
-        pastedImages.receive(message);
-        return;
-      }
-      let state = session.receive(message);
-      if (state && message.type === "load" && selection) {
-        const selected = selectionAtSource(state, message.text, selection);
-        if (selected) {
-          state = state.apply(state.tr.setSelection(selected).scrollIntoView());
-          session.update(state);
-        }
-        selection = undefined;
-      }
-      if (state) props.state = state;
-      if (props.state || props.nodeViews) view.setProps(props);
-      if (focus && message.type === "load") {
-        focus = false;
-        view.focus();
-      }
+      if (deferred.length > 0 || view.composing || composing(view.state)) deferred.push(message);
+      else apply(message);
     },
     view,
     find,

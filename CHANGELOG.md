@@ -5,6 +5,12 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Text typed with an input method, such as the Japanese, Chinese or Korean IME, a dead key on the
+  US-International keyboard, or the emoji panel (Win+.), is entered whole. Composing inside a
+  link's text no longer removes the link. In VS Code, the text you are still choosing a candidate
+  for is not sent to the file; once you commit it, it joins the typing around it as one undo step.
+  When the file changes outside Wysidown while you are composing, the change is shown once you
+  commit the text, and the text you composed is kept unless the change was to the same paragraph.
 - Find and replace, in the editor and in the desktop app's source mode. Ctrl+F opens the find
   bar and Ctrl+H opens it with a Replace box; in the desktop app they are also Edit > Find and
   Edit > Replace. The bar works as VS Code's does: Match Case (Alt+C), Match Whole Word (Alt+W)

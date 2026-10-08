@@ -6,6 +6,7 @@ import {
   type Mark,
   type Node,
   type ParseOptions,
+  type TagParseRule,
 } from "prosemirror-model";
 import type { MarkViewConstructor, NodeViewConstructor } from "prosemirror-view";
 import { codeBlockView } from "./code.ts";
@@ -60,7 +61,18 @@ const nodes: Record<string, (node: Node) => DOMOutputSpec> = {
 
 /** How each mark is shown. Links show their target as a tooltip and do not navigate. */
 const marks: Record<string, (mark: Mark) => DOMOutputSpec> = {
-  link: (m) => ["a", { title: str(m.attrs["href"]) || str(m.attrs["label"]) }, 0],
+  link: (m) => [
+    "a",
+    {
+      title: str(m.attrs["href"]) || str(m.attrs["label"]),
+      "data-href": str(m.attrs["href"]),
+      "data-title": m.attrs["title"] as string | null,
+      "data-identifier": m.attrs["identifier"] as string | null,
+      "data-label": m.attrs["label"] as string | null,
+      "data-reference-type": m.attrs["referenceType"] as string | null,
+    },
+    0,
+  ],
   em: () => ["em", 0],
   strong: () => ["strong", 0],
   strike: () => ["s", 0],
@@ -78,7 +90,20 @@ class ShownWhitespaceParser extends DOMParser {
   }
 }
 
-export const domParser = new ShownWhitespaceParser(schema, DOMParser.fromSchema(schema).rules);
+/** Reads back a link the view draws, which ProseMirror re-reads from the DOM after a composition in its text. */
+const shownLink: TagParseRule = {
+  tag: "a[data-href]",
+  mark: "link",
+  getAttrs: (d) => ({
+    href: d.getAttribute("data-href") ?? "",
+    title: d.getAttribute("data-title"),
+    identifier: d.getAttribute("data-identifier"),
+    label: d.getAttribute("data-label"),
+    referenceType: d.getAttribute("data-reference-type"),
+  }),
+};
+
+export const domParser = new ShownWhitespaceParser(schema, [...DOMParser.fromSchema(schema).rules, shownLink]);
 
 /**
  * Writes document content to the DOM, for the clipboard: standard HTML for other programs, with
