@@ -5,6 +5,13 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Keys that format text: Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+X strikethrough and Ctrl+E inline
+  code turn the format on or off for the selected text, or for the text you type next when nothing
+  is selected. Ctrl+1 to Ctrl+6 make the paragraph a heading of that level; pressing the key for
+  the level a heading already has makes it a paragraph again. In a list item or a quote only that
+  block changes. In VS Code these keys format text while Wysidown has the focus, and VS Code's own
+  commands for them, such as Ctrl+B for the side bar, do not also run. Ctrl+K, which edits a link,
+  no longer also starts a VS Code key chord.
 - Markdown typed into the editor becomes formatting as you type it. At the start of a paragraph,
   `#` to `######` and a space make a heading; `-`, `*` or `+` and a space start a bullet list;
   `1.` or `1)` and a space start a numbered list at that number; `[ ]` or `[x]` and a space at the

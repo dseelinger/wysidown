@@ -13,6 +13,10 @@ const editor = createEditor(
   { history: false },
 );
 createFindBar(document).attach(editor.find);
+// VS Code runs its keybinding for every keydown that reaches the window; a key the editor handled stops here.
+document.addEventListener("keydown", (event) => {
+  if (editor.handledKey(event)) event.stopPropagation();
+});
 window.addEventListener("message", (event: MessageEvent<HostMessage>) => {
   editor.receive(event.data);
 });

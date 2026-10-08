@@ -1,13 +1,14 @@
 import type { EditorMessage, HostMessage, Resources } from "@wysidown/core";
 import { baseKeymap } from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
-import { keymap } from "prosemirror-keymap";
+import { keydownHandler, keymap } from "prosemirror-keymap";
 import type { EditorState } from "prosemirror-state";
 import { EditorView, type DirectEditorProps } from "prosemirror-view";
 import { codeKeys } from "./code.ts";
 import { composing, composition, endsComposition } from "./composition.ts";
 import { DocumentFind } from "./document-find.ts";
 import type { FindTarget } from "./find.ts";
+import { formatKeys } from "./format.ts";
 import { highlighting } from "./highlight.ts";
 import { noResources } from "./images.ts";
 import { links } from "./links.ts";
@@ -29,6 +30,11 @@ export interface Editor {
   readonly find: FindTarget;
   /** The selection as offsets in the document's source. Sends any held typing first. */
   sourceSelection(): SourceSelection;
+  /**
+   * True when the editor acted on `event`, a keydown it has seen, and the host should not also
+   * act on the key: a key that formats text, or Mod-k when it edited a link.
+   */
+  handledKey(event: KeyboardEvent): boolean;
   destroy(): void;
 }
 
@@ -46,6 +52,10 @@ export interface EditorOptions {
 
 /** Milliseconds typing waits for more typing before it is sent, when the host owns undo. */
 const typingPause = 1000;
+
+const consumes = (keys: string[]) => keydownHandler(Object.fromEntries(keys.map((key) => [key, () => true])));
+const isFormatKey = consumes(Object.keys(formatKeys));
+const isLinkKey = consumes(["Mod-k"]);
 
 /**
  * Mounts the editor in `place` and sends `ready`. The host answers with `load`, and passes every
@@ -78,6 +88,7 @@ export function createEditor(
     keymap(tableKeys),
     keymap(codeKeys),
     keymap(listKeys),
+    keymap(formatKeys),
     keymap(baseKeymap),
     tables(),
     highlighting(),
@@ -185,6 +196,9 @@ export function createEditor(
     sourceSelection() {
       session.sendHeld();
       return sourceSelectionOf(view.state, session.text);
+    },
+    handledKey(event) {
+      return isFormatKey(view, event) || (event.defaultPrevented && isLinkKey(view, event));
     },
     destroy() {
       session.sendHeld();
