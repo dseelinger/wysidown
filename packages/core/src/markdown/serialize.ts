@@ -165,8 +165,14 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
         sameAttrs(original, edited, ["checked"]) &&
         original.attrs["checked"] !== null &&
         edited.attrs["checked"] !== null;
-      if (!toggled) return null;
-      head = (gap) => gap.replace(/\[[ xX]\]/, edited.attrs["checked"] ? "[x]" : "[ ]");
+      // A new first item is written with the list's start number; the items after it keep theirs.
+      const renumbered =
+        original.type.name === "list" &&
+        sameAttrs(original, edited, ["start"]) &&
+        edited.firstChild !== null &&
+        !source.ranges.has(edited.firstChild);
+      if (!toggled && !renumbered) return null;
+      if (toggled) head = (gap) => gap.replace(/\[[ xX]\]/, edited.attrs["checked"] ? "[x]" : "[ ]");
     }
     return emitChildren(original, edited, childPrefix(original, prefix), head);
   };
@@ -197,6 +203,16 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     while (j < n - i && j < m - i && before[n - 1 - j] === after[m - 1 - j]) j++;
     const removed = n - i - j;
     const added = m - i - j;
+
+    const joined =
+      !options.widen && added === 1 && removed > 1 ? emitJoined(before.slice(i, n - j), after[i]!, prefix) : null;
+    if (joined !== null) {
+      let out = gaps[0]!;
+      for (let k = 0; k < i; k++) out += kept(k) + gaps[k + 1]!;
+      out += joined + gaps[n - j]!;
+      for (let k = n - j; k < n; k++) out += kept(k) + gaps[k + 1]!;
+      return out;
+    }
 
     if (removed === added) {
       let out = gaps[0]!;
@@ -235,7 +251,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
 
     const fresh: string[] = [];
     for (let k = i; k < i + added; k++) {
-      const written = rewrite(after[k]!, prefix, edited, k, original);
+      const written = adopted.has(after[k]!) ? slice(after[k]!) : rewrite(after[k]!, prefix, edited, k, original);
       if (written === null) return null;
       fresh.push(written);
     }
@@ -265,6 +281,24 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     out += i > 0 ? apart(gaps[i]!) : separator;
     for (let k = i; k < n; k++) out += kept(k) + gaps[k + 1]!;
     return out;
+  };
+
+  /** Items of a list that a joined list took in, written as their source. */
+  const adopted = new Set<Node>();
+
+  /**
+   * Writes `joined`, a new list that took the place of `nodes`, against the first of them that is a
+   * list sharing an item with it. The items it took from other lists among `nodes` keep their
+   * source. Null when no list among `nodes` shares an item with it.
+   */
+  const emitJoined = (nodes: readonly Node[], joined: Node, prefix: string): string | null => {
+    if (joined.type.name !== "list") return null;
+    const lists = nodes.filter((node) => node.type === joined.type && shareAChild(node, joined));
+    const base = lists[0];
+    if (!base) return null;
+    const items = new Set(childNodes(joined));
+    for (const list of lists.slice(1)) for (const item of childNodes(list)) if (items.has(item)) adopted.add(item);
+    return emit(base, joined, prefix);
   };
 
   /** Splices a text-only edit within one run of text into the textblock's source. */
@@ -692,7 +726,7 @@ export function writeMarkdown(source: MarkdownSource, doc: Node, options: WriteO
     const before = childNodes(original);
     const after = childNodes(edited);
     const n = before.length;
-    const rows = pair(before, after, shareACell);
+    const rows = pair(before, after, shareAChild);
     if (n === 0 || rows[0] !== 0) return null;
     const r = range(original);
     const spans = before.map(range);
@@ -859,12 +893,12 @@ function pair(
   return out;
 }
 
-/** True when two rows share a cell. */
-function shareACell(was: Node, now: Node): boolean {
-  const cells = new Set<Node>();
-  was.forEach((cell) => cells.add(cell));
+/** True when two nodes share a child. */
+function shareAChild(was: Node, now: Node): boolean {
+  const children = new Set<Node>();
+  was.forEach((child) => children.add(child));
   let shared = false;
-  now.forEach((cell) => (shared ||= cells.has(cell)));
+  now.forEach((child) => (shared ||= children.has(child)));
   return shared;
 }
 

@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Typing a list marker at the start of a paragraph next to a list of the same kind adds the
+  paragraph to that list without rewriting the list's other items. Their numbers, their markers
+  and the tabs or spaces after them are saved as they were; only the new item and the line break
+  before or after it change.
 - Keys that format text: Ctrl+B bold, Ctrl+I italic, Ctrl+Shift+X strikethrough and Ctrl+E inline
   code turn the format on or off for the selected text, or for the text you type next when nothing
   is selected. Ctrl+1 to Ctrl+6 make the paragraph a heading of that level; pressing the key for

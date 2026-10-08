@@ -109,6 +109,15 @@ describe("markdown syntax typed at the start of a paragraph becomes a block", ()
     expect(typedBefore("Intro:\n\n- one\n\n- two\n", "Intro", "- ")).toBe("- Intro:\n\n- one\n\n- two\n");
   });
 
+  test("a list joined by typing keeps the existing items as written", () => {
+    expect(typedBefore("Intro:\n\n1. one\n2. two\n", "Intro", "1. ")).toBe("1. Intro:\n1. one\n2. two\n");
+    expect(typedBefore("-\tone\n-\ttwo\n\nOutro.\n", "Outro", "- ")).toBe("-\tone\n-\ttwo\n- Outro.\n");
+    expect(typedBefore("- a\n- b\n- c\n\nText.\n\nIntro:\n\n* one\n* two\n", "Intro", "- ")).toBe(
+      "- a\n- b\n- c\n\nText.\n\n* Intro:\n* one\n* two\n",
+    );
+    expect(typedBefore("- one\n\nMiddle\n\n-   two\n", "Middle", "- ")).toBe("- one\n- Middle\n-   two\n");
+  });
+
   test("a list next to a list of the other kind, and a quote next to a quote, stay apart", () => {
     expect(typedBefore("1. a\n2. b\n\nPara.\n", "Para", "- ")).toBe("1. a\n2. b\n\n- Para.\n");
     expect(typedBefore("> a\n\nPara.\n", "Para", "> ")).toBe("> a\n\n> Para.\n");
@@ -308,22 +317,38 @@ const conversions: { name: string; atEnd: boolean; enter: boolean; run: (wire: W
   })),
 ];
 
-/** True for a list, or a code block not written with a fence, which a list beside it can take in. */
+/** True for a code block not written with a fence, which a list beside it can take in. */
 const merges = (source: MarkdownSource, node: Node | null) =>
-  node?.type.name === "list" ||
-  (node?.type.name === "code_block" && !/^ *(?:```|~~~)/.test(source.text.slice(source.ranges.get(node)!.start)));
+  node?.type.name === "code_block" && !/^ *(?:```|~~~)/.test(source.text.slice(source.ranges.get(node)!.start));
 
 describe("a conversion typed into the realistic corpus changes only its own block", () => {
   test.each(realisticCases())("$name", ({ name, text }) => {
     const source = parseMarkdown(text);
-    const targets: { node: Node; pos: number; inItem: boolean }[] = [];
+    /** A list beside the target paragraph, and the conversion that joins the paragraph to it. */
+    interface Beside {
+      start: number;
+      end: number;
+      joins: string;
+    }
+    const targets: {
+      pos: number;
+      size: number;
+      own: { start: number; end: number };
+      beside: (Beside | null)[];
+      inItem: boolean;
+    }[] = [];
     source.doc.descendants((node, pos, parent, k) => {
       if (targets.length > 0) return false;
       if (node.type.name !== "paragraph" || node.childCount === 0 || !parent) return true;
       const around = [k > 0 ? parent.child(k - 1) : null, k + 1 < parent.childCount ? parent.child(k + 1) : null];
       const task = parent.type.name === "list_item" && k === 0 && parent.attrs["checked"] !== null;
-      if (!task && !around.some((n) => merges(source, n)))
-        targets.push({ node, pos, inItem: parent.type.name === "list_item" });
+      if (!task && !around.some((n) => merges(source, n))) {
+        const beside = around.map((n) =>
+          n?.type.name === "list" ? { ...source.ranges.get(n)!, joins: n.attrs["ordered"] ? "1. " : "- " } : null,
+        );
+        const own = source.ranges.get(node)!;
+        targets.push({ pos, size: node.nodeSize, own, beside, inItem: parent.type.name === "list_item" });
+      }
       return false;
     });
     const target = targets[0];
@@ -331,13 +356,21 @@ describe("a conversion typed into the realistic corpus changes only its own bloc
       expect(name, "the only document with no paragraph to type into").toMatch(/^07-code-fenced\.md /);
       return;
     }
-    const { node, pos, inItem } = target;
-    const range = source.ranges.get(node)!;
+    const { pos, size, own, beside, inItem } = target;
+    const [previous, next] = beside;
     const shift = source.bom ? 1 : 0;
+    /** True for a list typed beside a list of the other kind, which reads back as loose inside a blockquote. */
+    const otherKind = (c: { name: string }) =>
+      ["- ", "1. "].includes(c.name) && beside.some((b) => b !== null && b.joins !== c.name);
     // Enter in a list item adds an item; the fence and the rule are typed into it as list items test.
-    for (const conversion of conversions.filter((c) => !(inItem && c.enter))) {
+    for (const conversion of conversions.filter((c) => !(inItem && c.enter) && !otherKind(c))) {
+      // A list that takes the paragraph in also takes the gap between them.
+      const range = {
+        start: previous?.joins === conversion.name ? previous.end : own.start,
+        end: next?.joins === conversion.name ? next.start : own.end,
+      };
       const wire = new Wire(text, 0, typedSyntaxPlugins);
-      const cursor = pos + (conversion.atEnd ? node.nodeSize - 1 : 1);
+      const cursor = pos + (conversion.atEnd ? size - 1 : 1);
       wire.edit((s) => s.tr.setSelection(TextSelection.create(s.doc, cursor)));
       conversion.run(wire);
       wire.drain();
