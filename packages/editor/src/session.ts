@@ -268,7 +268,7 @@ function keepTyping(held: EditorState, state: EditorState, doc: Node): EditorSta
  * True when `tr` is a keystroke of typing: text inserted at the cursor, or one character deleted,
  * within one textblock. A paste, a drop, a cut, Enter and a command that changes structure are not.
  */
-function typing(tr: Transaction): boolean {
+export function typing(tr: Transaction): boolean {
   if (tr.steps.length !== 1 || tr.getMeta("uiEvent") !== undefined) return false;
   const step = tr.steps[0];
   if (!(step instanceof ReplaceStep) || step.slice.openStart !== 0 || step.slice.openEnd !== 0) return false;

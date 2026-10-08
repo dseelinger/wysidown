@@ -132,6 +132,24 @@ for (const place of places) {
   });
 }
 
+test("markdown syntax in an open composition stays as typed, and a closing marker it commits formats", async ({
+  harness: page,
+}) => {
+  await load(page, doc);
+  await caret(page, "A paragraph of text.", "End");
+  await page.keyboard.type(" `code");
+  await countCompositions(page);
+  const cdp = await page.context().newCDPSession(page);
+  await compose(page, cdp, ["`"]);
+  await page.waitForTimeout(100);
+  await expect(page.locator(".ProseMirror p code")).toHaveCount(0);
+  expect(await compositions(page)).toEqual({ start: 1, end: 0 });
+  await commit(cdp, "`");
+  await expect(page.locator(".ProseMirror p code")).toHaveText("code");
+  await expect.poll(() => hostText(page)).toBe(doc.replace("of text.", "of text. `code`"));
+  expect(await compositions(page)).toEqual({ start: 1, end: 1 });
+});
+
 test("composing the end of a keyword that is already typed does not end the composition", async ({ harness: page }) => {
   await load(page, doc);
   await caret(page, "let x = 1;", "End", "Enter");

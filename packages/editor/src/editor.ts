@@ -19,6 +19,7 @@ import { Session } from "./session.ts";
 import { softBreaks } from "./soft-breaks.ts";
 import { selectionAtSource, sourceSelectionOf, type SourceSelection } from "./source-selection.ts";
 import { tableKeys, tables } from "./tables.ts";
+import { typedSyntaxKeys, typedSyntaxPlugins } from "./typed-syntax.ts";
 
 export interface Editor {
   /** Passes a message from the host to the editor. */
@@ -72,6 +73,8 @@ export function createEditor(
   const plugins = [
     composition(),
     ...undoable,
+    ...typedSyntaxPlugins,
+    keymap(typedSyntaxKeys),
     keymap(tableKeys),
     keymap(codeKeys),
     keymap(listKeys),

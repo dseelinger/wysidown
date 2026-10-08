@@ -5,6 +5,17 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Markdown typed into the editor becomes formatting as you type it. At the start of a paragraph,
+  `#` to `######` and a space make a heading; `-`, `*` or `+` and a space start a bullet list;
+  `1.` or `1)` and a space start a numbered list at that number; `[ ]` or `[x]` and a space at the
+  start of a list item make it a task; `>` and a space make a quote. A line holding only ` ``` `
+  or `~~~`, optionally with a language, starts a code block when you press Enter, and `---`, `***`
+  or `___` adds a horizontal rule. Around text, `**bold**`, `__bold__`, `*italic*`, `_italic_`,
+  `` `code` `` and `~~struck~~` format the text when you type the closing marker. Backspace
+  straight after a conversion takes it back and leaves what you typed. Nothing converts inside a
+  code block or inline code, or while an input method is composing. New syntax is saved with the
+  markers the document already uses most, and a list typed next to a list of the same kind joins
+  it.
 - Text typed with an input method, such as the Japanese, Chinese or Korean IME, a dead key on the
   US-International keyboard, or the emoji panel (Win+.), is entered whole. Composing inside a
   link's text no longer removes the link. In VS Code, the text you are still choosing a candidate
