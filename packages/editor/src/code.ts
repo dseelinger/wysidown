@@ -134,6 +134,7 @@ export function codeBlockView(document: Document): NodeViewConstructor {
     input.setAttribute("list", languageList(document));
     const pre = dom.appendChild(document.createElement("pre"));
     const contentDOM = pre.appendChild(document.createElement("code"));
+    contentDOM.spellcheck = false;
 
     const show = () => {
       input.value = (node.attrs["lang"] as string | null) ?? "";

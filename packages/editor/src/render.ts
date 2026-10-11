@@ -76,7 +76,7 @@ const marks: Record<string, (mark: Mark) => DOMOutputSpec> = {
   em: () => ["em", 0],
   strong: () => ["strong", 0],
   strike: () => ["s", 0],
-  code: () => ["code", 0],
+  code: () => ["code", { spellcheck: "false" }, 0],
 };
 
 /**

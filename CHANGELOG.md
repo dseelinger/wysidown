@@ -5,6 +5,9 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Code blocks and inline code are no longer underlined as misspelled words in the desktop app.
+  Paragraphs, headings, lists, tables and link text are still spellchecked.
+
 - A desktop window can show two documents side by side. View > Split Right (Ctrl+\) moves the
   current tab into a new right pane, and with two panes it moves the tab to the other pane; View >
   Move Tab to Other Pane (Ctrl+Alt+Right or Ctrl+Alt+Left) does the same. Each pane has its own
