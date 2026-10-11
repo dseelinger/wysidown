@@ -1,8 +1,8 @@
-import { schema } from "@wysidown/core";
+import { schema, type MarkdownSource } from "@wysidown/core";
 import { InputRule, inputRules, undoInputRule } from "prosemirror-inputrules";
 import type { Attrs, MarkType, Node, NodeType, ResolvedPos } from "prosemirror-model";
 import { Plugin, PluginKey, type Command, type EditorState, type Transaction } from "prosemirror-state";
-import { typing } from "./session.ts";
+import { sourceOf, typing } from "./session.ts";
 
 const { paragraph, heading, list, list_item: item, blockquote, code_block: codeBlock } = schema.nodes;
 const marks = schema.marks;
@@ -34,34 +34,49 @@ function startsTask($pos: ResolvedPos): boolean {
  */
 function atStart(
   match: RegExp,
-  convert: (tr: Transaction, $start: ResolvedPos, match: RegExpMatchArray) => boolean,
+  convert: (tr: Transaction, $start: ResolvedPos, match: RegExpMatchArray, state: EditorState) => boolean,
 ): InputRule {
   return rule(match, (state, m, start, end) => {
     const $start = state.doc.resolve(start);
     if ($start.parent.type !== paragraph || $start.parentOffset !== 0 || startsTask($start)) return null;
     const tr = state.tr.delete(start, end);
-    return convert(tr, tr.doc.resolve(start), m) ? tr : null;
+    return convert(tr, tr.doc.resolve(start), m, state) ? tr : null;
   });
+}
+
+/** The marker `list` is written with: its bullet, or the delimiter after its numbers. */
+function markerOf(list: Node, source: MarkdownSource | null): string {
+  if (!source) return list.attrs["ordered"] ? "." : "-";
+  for (let k = 0; k < list.childCount; k++) {
+    const range = source.ranges.get(list.child(k));
+    const m = range && /^(?:([-*+])|\d+([.)]))/.exec(source.text.slice(range.start));
+    if (m) return m[1] ?? m[2]!;
+  }
+  return list.attrs["ordered"] ? "." : source.style.bullet;
 }
 
 /**
  * Wraps the paragraph at `$start` in `type`, with a list item inside when `type` is a list. A new
- * list joins a list of the same kind straight before or after it, as markdown would read them.
+ * list joins a list of the same kind straight before or after it, taking that list's marker. With
+ * one on each side, it joins the list after only when both lists have the same marker, since
+ * markdown reads lists with different markers as separate lists.
  */
 function wrap(type: NodeType, attrs: Attrs | null) {
-  return (tr: Transaction, $start: ResolvedPos): boolean => {
+  return (tr: Transaction, $start: ResolvedPos, source: MarkdownSource | null): boolean => {
     const range = $start.blockRange();
     if (!range) return false;
+    const sameKind = (node: Node | null | undefined): node is Node =>
+      node?.type === list && node.attrs["ordered"] === attrs?.["ordered"];
+    const before = tr.doc.resolve(range.start).nodeBefore;
+    const after = tr.doc.resolve(range.end).nodeAfter;
+    const joinBefore = sameKind(before);
+    const joinAfter = sameKind(after) && (!joinBefore || markerOf(before, source) === markerOf(after, source));
     tr.wrap(range, [{ type, attrs }, ...(type === list ? [{ type: item, attrs: null }] : [])]);
     if (type !== list) return true;
-    const sameKind = (node: Node | null | undefined) =>
-      node?.type === list && node.attrs["ordered"] === attrs?.["ordered"];
     const at = range.start;
     const end = at + tr.doc.nodeAt(at)!.nodeSize;
-    const after = tr.doc.resolve(end).nodeAfter;
-    if (sameKind(after))
-      tr.join(end).setNodeMarkup(at, null, { ...after!.attrs, start: attrs?.["start"] as number | null });
-    if (sameKind(tr.doc.resolve(at).nodeBefore)) tr.join(at);
+    if (joinAfter) tr.join(end).setNodeMarkup(at, null, { ...after.attrs, start: attrs?.["start"] as number | null });
+    if (joinBefore) tr.join(at);
     return true;
   };
 }
@@ -93,9 +108,13 @@ const rules = [
     tr.setBlockType($start.pos, $start.pos, heading, { level: m[1]!.length });
     return true;
   }),
-  atStart(/^[-+*] $/, (tr, $start) => wrap(list, { ordered: false, start: null })(tr, $start)),
-  atStart(/^(\d{1,9})[.)] $/, (tr, $start, m) => wrap(list, { ordered: true, start: Number(m[1]) })(tr, $start)),
-  atStart(/^> $/, wrap(blockquote, null)),
+  atStart(/^[-+*] $/, (tr, $start, _, state) =>
+    wrap(list, { ordered: false, start: null })(tr, $start, sourceOf(state)),
+  ),
+  atStart(/^(\d{1,9})[.)] $/, (tr, $start, m, state) =>
+    wrap(list, { ordered: true, start: Number(m[1]) })(tr, $start, sourceOf(state)),
+  ),
+  atStart(/^> $/, (tr, $start) => wrap(blockquote, null)(tr, $start, null)),
   task,
   // Text between markers neither starts nor ends with a space; `_` does not open inside a word.
   around(/(?<!\*)\*\*([^*\s\ufffc](?:[^*\ufffc]*[^*\s\ufffc])?)\*\*$/u, 2, marks.strong),

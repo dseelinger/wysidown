@@ -8,11 +8,18 @@ import {
   type MarkdownSource,
 } from "@wysidown/core";
 import { Fragment, type Node } from "prosemirror-model";
-import { EditorState, Selection, type Plugin, type Transaction } from "prosemirror-state";
+import { EditorState, Plugin, PluginKey, Selection, type Transaction } from "prosemirror-state";
 import { ReplaceStep } from "prosemirror-transform";
 import { composing, endsComposition } from "./composition.ts";
 import { fromHost, keepReferencedDefinitions } from "./definitions.ts";
 import { keepATextblock, shown, written } from "./empty-document.ts";
+
+const loadedSource = new PluginKey<() => MarkdownSource | null>("loadedSource");
+
+/** The source the session of `state` writes against; null before a load, or for a state made outside a session. */
+export function sourceOf(state: EditorState): MarkdownSource | null {
+  return loadedSource.getState(state)?.() ?? null;
+}
 
 /**
  * The editor's side of the host protocol, with no view. Writes the document against the source of
@@ -46,7 +53,11 @@ export class Session {
   constructor(post: (message: EditorMessage) => void, plugins: readonly Plugin[] = [], hold = 0) {
     this.#post = post;
     this.#hold = hold;
-    this.#plugins = [keepReferencedDefinitions, keepATextblock, ...plugins];
+    const source = new Plugin({
+      key: loadedSource,
+      state: { init: () => () => this.#source, apply: (_, value) => value },
+    });
+    this.#plugins = [keepReferencedDefinitions, keepATextblock, source, ...plugins];
     this.#state = EditorState.create({ schema, plugins: [...this.#plugins] });
   }
 

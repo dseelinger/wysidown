@@ -123,6 +123,42 @@ describe("markdown syntax typed at the start of a paragraph becomes a block", ()
     expect(typedBefore("> a\n\nPara.\n", "Para", "> ")).toBe("> a\n\n> Para.\n");
   });
 
+  test("a list typed between two lists with the same marker joins both", () => {
+    expect(typedBefore("* one\n\nMiddle\n\n* two\n", "Middle", "- ")).toBe("* one\n* Middle\n* two\n");
+    expect(typedBefore("1) one\n\nMiddle\n\n1) two\n", "Middle", "1. ")).toBe("1) one\n2) Middle\n1) two\n");
+  });
+
+  test("a list typed between lists with different markers joins the one before, and the one after keeps its bytes", () => {
+    for (const [text, typed, saved] of [
+      ["- one\n\nMiddle\n\n* two\n* three\n", "- ", "- one\n- Middle\n\n* two\n* three\n"],
+      ["- one\n\nMiddle\n\n* two\n* three\n", "* ", "- one\n- Middle\n\n* two\n* three\n"],
+      ["+ one\n\nMiddle\n\n- two\n", "- ", "+ one\n+ Middle\n\n- two\n"],
+      ["1. one\n\nMiddle\n\n1) two\n", "1. ", "1. one\n2. Middle\n\n1) two\n"],
+      ["1) one\n\nMiddle\n\n1. two\n", "1. ", "1) one\n2) Middle\n\n1. two\n"],
+    ] as const) {
+      const wire = wireAt(text, "Middle", true);
+      type(wire, typed);
+      wire.drain();
+      expect(wire.host.text).toBe(saved);
+      expect(parseMarkdown(wire.host.text).doc.toJSON()).toEqual(wire.state.doc.toJSON());
+    }
+  });
+
+  test("a list typed earlier in the session has the document's bullet when a list is typed beside it", () => {
+    for (const [text, saved] of [
+      ["A\n\nMiddle\n\n* two\n", "* A\n* Middle\n* two\n"],
+      ["- a\n- b\n\nText.\n\nA\n\nMiddle\n\n* two\n", "- a\n- b\n\nText.\n\n- A\n- Middle\n\n* two\n"],
+    ] as const) {
+      const wire = wireAt(text, "A", true);
+      type(wire, "- ");
+      moveTo(wire, "Middle", true);
+      type(wire, "- ");
+      wire.drain();
+      expect(wire.host.text).toBe(saved);
+      expect(parseMarkdown(wire.host.text).doc.toJSON()).toEqual(wire.state.doc.toJSON());
+    }
+  });
+
   test("a list typed before a list of the other kind in a quote saves text that reads back as typed", () => {
     for (const [text, typed, saved] of [
       ["> Intro:\n>\n> - one\n> - two\n>\n> End.\n", "1. ", "> 1. Intro:\n>\n> - one\n> - two\n>\n> End.\n"],

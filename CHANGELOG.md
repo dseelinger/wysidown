@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- Typing a list marker at the start of a paragraph that sits between two lists written with
+  different markers, such as `- ` above and `* ` below, or `1.` above and `1)` below, adds the
+  paragraph to the list above only. The list below stays a separate list and its lines are saved
+  as they were, instead of being rewritten with the other list's marker.
 - A list in a quote that is followed by a blank `>` line is shown with its items close together,
   as GitHub shows it, instead of spaced apart as if blank lines separated them. A list typed with
   `1. ` or `- ` just before a list of the other kind in a quote looks the same in the editor as it

@@ -5,14 +5,27 @@ import { byteOrderMark } from "../src/text/byte-order-mark.ts";
 import { parseMarkdown } from "../src/markdown/parse.ts";
 import { schema } from "../src/markdown/schema.ts";
 import { serializeMarkdown } from "../src/markdown/serialize.ts";
+import type { MarkdownSource } from "../src/markdown/source.ts";
 
 const { list, list_item: item } = schema.nodes;
 
+/** The marker `list` is written with in `source`: its bullet, or the delimiter after its numbers. */
+function markerOf(list: Node, source: MarkdownSource): string {
+  for (let k = 0; k < list.childCount; k++) {
+    const range = source.ranges.get(list.child(k));
+    const m = range && /^(?:([-*+])|\d+([.)]))/.exec(source.text.slice(range.start));
+    if (m) return m[1] ?? m[2]!;
+  }
+  return list.attrs["ordered"] ? "." : source.style.bullet;
+}
+
 /**
  * Makes the paragraph that starts with `find` an item of a new list, joined to a list of the same
- * kind straight before or after it, as typing a list marker at its start does in the editor.
+ * kind straight before or after it, as typing a list marker at its start does in the editor. With
+ * one on each side, the list after is joined only when both lists have the same marker.
  */
-function join(doc: Node, find: string, ordered: boolean, start: number | null): Transform {
+function join(source: MarkdownSource, find: string, ordered: boolean, start: number | null): Transform {
+  const doc = source.doc;
   let pos = -1;
   doc.descendants((node, p) => {
     if (pos < 0 && node.type.name === "paragraph" && node.textContent.startsWith(find)) pos = p;
@@ -20,16 +33,20 @@ function join(doc: Node, find: string, ordered: boolean, start: number | null): 
   });
   const tr = new Transform(doc);
   const range = tr.doc.resolve(pos + 1).blockRange()!;
+  const sameKind = (node: Node | null | undefined): node is Node =>
+    node?.type === list && node.attrs["ordered"] === ordered;
+  const before = tr.doc.resolve(range.start).nodeBefore;
+  const after = tr.doc.resolve(range.end).nodeAfter;
+  const joinBefore = sameKind(before);
+  const joinAfter = sameKind(after) && (!joinBefore || markerOf(before, source) === markerOf(after, source));
   tr.wrap(range, [
     { type: list, attrs: { ordered, start } },
     { type: item, attrs: null },
   ]);
-  const sameKind = (node: Node | null | undefined) => node?.type === list && node.attrs["ordered"] === ordered;
   const at = range.start;
   const end = at + tr.doc.nodeAt(at)!.nodeSize;
-  const after = tr.doc.resolve(end).nodeAfter;
-  if (sameKind(after)) tr.join(end).setNodeMarkup(at, null, { ...after!.attrs, start });
-  if (sameKind(tr.doc.resolve(at).nodeBefore)) tr.join(at);
+  if (joinAfter) tr.join(end).setNodeMarkup(at, null, { ...after.attrs, start });
+  if (joinBefore) tr.join(at);
   return tr;
 }
 
@@ -46,7 +63,7 @@ function items(doc: Node, find: string): Node[] {
 /** Saves `input` with the paragraph starting `find` joined to the list beside it. */
 function saved(input: string, find: string, ordered = false, start: number | null = null): string {
   const source = parseMarkdown(input);
-  const doc = join(source.doc, find, ordered, start).doc;
+  const doc = join(source, find, ordered, start).doc;
   const kept = new Set(items(doc, find));
   expect(items(source.doc, find).every((original) => kept.has(original))).toBe(true);
   const result = serializeMarkdown(source, doc);
@@ -156,7 +173,8 @@ describe("a paragraph joined to a list keeps the list's own bytes", () => {
     });
   }
 
-  test("two lists with different bullets joined into one are written with one bullet", () => {
-    expect(saved("- one\n\nMiddle\n\n* two\n* three\n", "Middle")).toBe("- one\n- Middle\n- two\n- three\n");
+  test("a list with a different marker on each side joins the one before, and the one after keeps its bytes", () => {
+    expect(saved("- one\n\nMiddle\n\n* two\n* three\n", "Middle")).toBe("- one\n- Middle\n\n* two\n* three\n");
+    expect(saved("1. one\n\nMiddle\n\n1) two\n", "Middle", true, 1)).toBe("1. one\n2. Middle\n\n1) two\n");
   });
 });
