@@ -36,6 +36,8 @@ interface Editor {
   closing: boolean;
   /** True while the window shows the markdown source in place of the rendered document. */
   sourceMode: boolean;
+  /** The number in the document's name while it has no file: 1 for `Untitled.md`, 2 for `Untitled-2.md`. */
+  readonly untitled: number;
 }
 
 const editors = new Set<Editor>();
@@ -52,11 +54,25 @@ async function readText(path: string): Promise<string> {
   return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 }
 
+/** The lowest untitled number no document without a file is using. */
+function freeUntitledNumber(): number {
+  const used = new Set([...editors].filter((e) => e.doc.path === null).map((e) => e.untitled));
+  let number = 1;
+  while (used.has(number)) number++;
+  return number;
+}
+
+/** The document's name: its file's name, or `Untitled.md`, `Untitled-2.md` and so on when it has no file. */
+function documentName(editor: Editor): string {
+  const { doc, untitled } = editor;
+  if (doc.path !== null) return basename(doc.path);
+  return untitled === 1 ? "Untitled.md" : `Untitled-${String(untitled)}.md`;
+}
+
 function updateTitle(editor: Editor): void {
   const { win, doc } = editor;
   if (win.isDestroyed()) return;
-  const name = doc.path === null ? "Untitled" : basename(doc.path);
-  win.setTitle(`${doc.dirty ? "● " : ""}${name} — Wysidown`);
+  win.setTitle(`${doc.dirty ? "● " : ""}${documentName(editor)} — Wysidown`);
 }
 
 async function showError(editor: Editor, message: string, detail: string): Promise<void> {
@@ -101,7 +117,7 @@ async function saveTo(editor: Editor, path: string): Promise<boolean> {
 async function saveAs(editor: Editor): Promise<boolean> {
   if (editor.win.isDestroyed()) return false;
   const result = await dialog.showSaveDialog(editor.win, {
-    defaultPath: editor.doc.path ?? "Untitled.md",
+    defaultPath: editor.doc.path ?? documentName(editor),
     filters: [markdownFilter],
   });
   if (result.canceled || !result.filePath) return false;
@@ -117,10 +133,9 @@ async function confirmDiscard(editor: Editor): Promise<boolean> {
   const { win, doc } = editor;
   await doc.flush();
   if (win.isDestroyed() || !doc.dirty) return true;
-  const name = doc.path === null ? "Untitled" : basename(doc.path);
   const { response } = await dialog.showMessageBox(win, {
     type: "warning",
-    message: `Save changes to ${name}?`,
+    message: `Save changes to ${documentName(editor)}?`,
     detail: "Your changes will be lost if you don't save them.",
     buttons: ["Save", "Don't Save", "Cancel"],
     defaultId: 0,
@@ -382,7 +397,14 @@ function createWindow(path?: string): void {
       updateTitle(created);
     },
   );
-  const created: Editor = { win, doc, folder: null, closing: false, sourceMode: false };
+  const created: Editor = {
+    win,
+    doc,
+    folder: null,
+    closing: false,
+    sourceMode: false,
+    untitled: freeUntitledNumber(),
+  };
   editors.add(created);
   lastFocused = created;
   doc.setResources(resourcesOf(null, settings.remoteImages));

@@ -5,6 +5,10 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app started without a file opens on an empty document named `Untitled.md`, with
+  the caret already in it, so typing starts at once. The title bar, the "Save changes?" prompt
+  and the Save As dialog all use that name. A second untitled window is `Untitled-2.md`, then
+  `Untitled-3.md`, each taking the lowest number not already in use.
 - Typing a list marker at the start of a paragraph that sits between two lists written with
   different markers, such as `- ` above and `* ` below, or `1.` above and `1)` below, adds the
   paragraph to the list above only. The list below stays a separate list and its lines are saved

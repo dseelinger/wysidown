@@ -112,7 +112,7 @@ test("Save on an untitled document asks where to save it", async () => {
   try {
     await window.locator(".ProseMirror").click();
     await window.keyboard.type("Hello");
-    await expect.poll(() => title(app)).toBe("● Untitled — Wysidown");
+    await expect.poll(() => title(app)).toBe("● Untitled.md — Wysidown");
     await chooseToSaveAs(app, path);
     await save(app, path, "Hello");
     await expect.poll(() => title(app)).toBe("new.md — Wysidown");

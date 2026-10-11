@@ -18,7 +18,7 @@ bridge.onTheme((theme) => {
 const post = (message: EditorMessage) => {
   bridge.post(message);
 };
-let pane: Editor | SourceEditor = createEditor(place, post);
+let pane: Editor | SourceEditor = createEditor(place, post, { focus: true });
 let sourceMode = false;
 const findBar = createFindBar(document);
 findBar.attach(pane.find);

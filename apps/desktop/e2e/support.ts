@@ -128,11 +128,28 @@ export async function chooseToOpen(app: ElectronApplication, path: string): Prom
   }, path);
 }
 
-/** Makes the next save dialog choose `path`. */
+/**
+ * Makes the next save dialog choose `path`, and records each dialog's default path in
+ * `globalThis.saveDialogDefaults` of the main process.
+ */
 export async function chooseToSaveAs(app: ElectronApplication, path: string): Promise<void> {
   await app.evaluate(({ dialog }, filePath) => {
-    Object.assign(dialog, { showSaveDialog: () => Promise.resolve({ canceled: false, filePath }) });
+    const seen: (string | undefined)[] = [];
+    Object.assign(globalThis, { saveDialogDefaults: seen });
+    Object.assign(dialog, {
+      showSaveDialog: (_window: unknown, options: { defaultPath?: string }) => {
+        seen.push(options.defaultPath);
+        return Promise.resolve({ canceled: false, filePath });
+      },
+    });
   }, path);
+}
+
+/** The default paths of the save dialogs shown since `chooseToSaveAs`. */
+export async function saveDialogDefaults(app: ElectronApplication): Promise<(string | undefined)[]> {
+  return app.evaluate(
+    () => (globalThis as unknown as { saveDialogDefaults: (string | undefined)[] }).saveDialogDefaults,
+  );
 }
 
 /**

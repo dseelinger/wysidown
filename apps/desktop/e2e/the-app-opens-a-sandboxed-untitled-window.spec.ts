@@ -1,16 +1,62 @@
 import { test } from "@playwright/test";
-import { expect, launch, quit, title } from "./support.ts";
+import {
+  answerMessageBoxes,
+  chooseToSaveAs,
+  expect,
+  launch,
+  menu,
+  messageBoxes,
+  newPath,
+  quit,
+  readText,
+  saveDialogDefaults,
+  title,
+} from "./support.ts";
 
-test("the app opens one untitled window with no console errors", async () => {
+test("the app opens one window on an empty Untitled.md with no console errors", async () => {
   const { app, window, errors } = await launch();
   try {
     await expect(window.locator(".ProseMirror")).toBeVisible();
-    expect(await title(app)).toBe("Untitled — Wysidown");
+    await expect(window.locator(".ProseMirror")).toHaveText("");
+    expect(await title(app)).toBe("Untitled.md — Wysidown");
     expect(app.windows()).toHaveLength(1);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
   }
+});
+
+test("typing goes into the untitled document without a click, and Save asks where to save it", async () => {
+  const path = newPath("typed.md");
+  const { app, window, errors } = await launch();
+  try {
+    await expect(window.locator(".ProseMirror")).toBeFocused();
+    await window.keyboard.type("Hello, world");
+    await expect.poll(() => title(app)).toBe("● Untitled.md — Wysidown");
+    await answerMessageBoxes(app, "Cancel");
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]!.close();
+    });
+    await expect.poll(() => messageBoxes(app)).toEqual(["Save changes to Untitled.md?"]);
+    await chooseToSaveAs(app, path);
+    await menu(app, "save");
+    await expect.poll(() => title(app)).toBe("typed.md — Wysidown");
+    expect(readText(path)).toBe("Hello, world");
+    expect(await saveDialogDefaults(app)).toEqual(["Untitled.md"]);
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("closing an untitled document with no edits asks nothing", async () => {
+  const { app } = await launch();
+  await answerMessageBoxes(app, "Cancel");
+  const closed = app.waitForEvent("close");
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]!.close();
+  });
+  await closed;
 });
 
 test("the page has no Node access and reaches the main process only through the bridge", async () => {
