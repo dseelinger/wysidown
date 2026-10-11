@@ -14,6 +14,7 @@ import type { CharMap, LinkSpan, MarkdownSource, Range } from "./source.ts";
 import { detectStyle } from "./style.ts";
 
 const frontmatterKinds = ["yaml", "toml"] as const;
+const lineEnding = /\r\n|\r|\n/;
 
 /** Parses markdown (byte order mark already removed) to mdast with GFM, front matter and math. */
 export function parseMdast(text: string): M.Root {
@@ -181,6 +182,13 @@ export function parseMarkdown(input: string): MarkdownSource {
     return recorded(schema.nodes.raw_block.create({ source: sourceOf(n), kind, identifier }), n);
   };
 
+  /** True when a blank line separates two of the list's items; mdast also counts one that ends a list in a blockquote. */
+  const blankBetweenItems = (l: M.List) =>
+    l.children.some(
+      (item, i) =>
+        i > 0 && text.slice(rangeOf(l.children[i - 1]!).end, rangeOf(item).start).split(lineEnding).length > 2,
+    );
+
   const block = (n: M.Node): Node => {
     switch (n.type) {
       case "paragraph":
@@ -193,7 +201,8 @@ export function parseMarkdown(input: string): MarkdownSource {
         return recorded(schema.nodes.blockquote.create(null, (n as M.Blockquote).children.map(block)), n);
       case "list": {
         const l = n as M.List;
-        const attrs = { ordered: l.ordered ?? false, start: l.start ?? null, spread: l.spread ?? false };
+        const spread = (l.spread ?? false) && blankBetweenItems(l);
+        const attrs = { ordered: l.ordered ?? false, start: l.start ?? null, spread };
         return recorded(schema.nodes.list.create(attrs, l.children.map(block)), n);
       }
       case "listItem": {

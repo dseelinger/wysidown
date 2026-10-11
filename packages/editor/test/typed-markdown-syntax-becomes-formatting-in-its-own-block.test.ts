@@ -123,6 +123,19 @@ describe("markdown syntax typed at the start of a paragraph becomes a block", ()
     expect(typedBefore("> a\n\nPara.\n", "Para", "> ")).toBe("> a\n\n> Para.\n");
   });
 
+  test("a list typed before a list of the other kind in a quote saves text that reads back as typed", () => {
+    for (const [text, typed, saved] of [
+      ["> Intro:\n>\n> - one\n> - two\n>\n> End.\n", "1. ", "> 1. Intro:\n>\n> - one\n> - two\n>\n> End.\n"],
+      ["> Intro:\n>\n> 1. one\n> 2. two\n>\n> End.\n", "- ", "> - Intro:\n>\n> 1. one\n> 2. two\n>\n> End.\n"],
+    ] as const) {
+      const wire = wireAt(text, "Intro", true);
+      type(wire, typed);
+      wire.drain();
+      expect(wire.host.text).toBe(saved);
+      expect(parseMarkdown(wire.host.text).doc.toJSON()).toEqual(wire.state.doc.toJSON());
+    }
+  });
+
   test("[ ] at the start of a task's text, or of an item's second paragraph, stays as text", () => {
     const wire = wireAt("- [ ] task\n- plain\n\n  more\n", "task", true);
     type(wire, "[x] ");
@@ -359,11 +372,8 @@ describe("a conversion typed into the realistic corpus changes only its own bloc
     const { pos, size, own, beside, inItem } = target;
     const [previous, next] = beside;
     const shift = source.bom ? 1 : 0;
-    /** True for a list typed beside a list of the other kind, which reads back as loose inside a blockquote. */
-    const otherKind = (c: { name: string }) =>
-      ["- ", "1. "].includes(c.name) && beside.some((b) => b !== null && b.joins !== c.name);
     // Enter in a list item adds an item; the fence and the rule are typed into it as list items test.
-    for (const conversion of conversions.filter((c) => !(inItem && c.enter) && !otherKind(c))) {
+    for (const conversion of conversions.filter((c) => !(inItem && c.enter))) {
       // A list that takes the paragraph in also takes the gap between them.
       const range = {
         start: previous?.joins === conversion.name ? previous.end : own.start,
