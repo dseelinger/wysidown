@@ -1,4 +1,4 @@
-// Bundles the Electron main process, the preload script and the renderer page into dist/. Warnings fail the build.
+// Bundles the Electron main process, the preload scripts, the document page and the tab row into dist/. Warnings fail the build.
 import { build } from "esbuild";
 import { copyFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -30,7 +30,20 @@ const results = await Promise.all([
   }),
   build({
     ...common,
-    entryPoints: { renderer: "src/renderer/renderer.ts", editor: join(editorSrc, "editor.css") },
+    entryPoints: ["src/renderer/tab-row-preload.ts"],
+    outfile: "dist/tab-row-preload.cjs",
+    platform: "node",
+    format: "cjs",
+    target: "node22",
+    external: ["electron"],
+  }),
+  build({
+    ...common,
+    entryPoints: {
+      "tab-row": "src/renderer/tab-row.ts",
+      renderer: "src/renderer/renderer.ts",
+      editor: join(editorSrc, "editor.css"),
+    },
     outdir: "dist/renderer",
     platform: "browser",
     format: "iife",
@@ -42,4 +55,6 @@ if (warnings.length > 0) {
   throw new Error(warnings.map((w) => w.text).join("\n"));
 }
 
-copyFileSync("src/renderer/index.html", "dist/renderer/index.html");
+for (const file of ["index.html", "tab-row.html", "tab-row.css"]) {
+  copyFileSync(join("src/renderer", file), join("dist/renderer", file));
+}

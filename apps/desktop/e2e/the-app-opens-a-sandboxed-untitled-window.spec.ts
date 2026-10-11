@@ -2,6 +2,7 @@ import { test } from "@playwright/test";
 import {
   answerMessageBoxes,
   chooseToSaveAs,
+  closeWindow,
   expect,
   launch,
   menu,
@@ -10,7 +11,10 @@ import {
   quit,
   readText,
   saveDialogDefaults,
+  tabRowPage,
+  tabs,
   title,
+  windowCount,
 } from "./support.ts";
 
 test("the app opens one window on an empty Untitled.md with no console errors", async () => {
@@ -19,7 +23,8 @@ test("the app opens one window on an empty Untitled.md with no console errors", 
     await expect(window.locator(".ProseMirror")).toBeVisible();
     await expect(window.locator(".ProseMirror")).toHaveText("");
     expect(await title(app)).toBe("Untitled.md — Wysidown");
-    expect(app.windows()).toHaveLength(1);
+    expect(await windowCount(app)).toBe(1);
+    expect(await tabs(app)).toEqual(["Untitled.md (active)"]);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
@@ -34,9 +39,7 @@ test("typing goes into the untitled document without a click, and Save asks wher
     await window.keyboard.type("Hello, world");
     await expect.poll(() => title(app)).toBe("● Untitled.md — Wysidown");
     await answerMessageBoxes(app, "Cancel");
-    await app.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0]!.close();
-    });
+    await closeWindow(app);
     await expect.poll(() => messageBoxes(app)).toEqual(["Save changes to Untitled.md?"]);
     await chooseToSaveAs(app, path);
     await menu(app, "save");
@@ -53,9 +56,7 @@ test("closing an untitled document with no edits asks nothing", async () => {
   const { app } = await launch();
   await answerMessageBoxes(app, "Cancel");
   const closed = app.waitForEvent("close");
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]!.close();
-  });
+  await closeWindow(app);
   await closed;
 });
 
@@ -90,7 +91,73 @@ test("the page cannot navigate away or open a window", async () => {
     });
     await window.waitForTimeout(500);
     expect(window.url()).toBe(url);
-    expect(app.windows()).toHaveLength(1);
+    expect(await windowCount(app)).toBe(1);
+    expect(app.windows()).toHaveLength(2);
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("the tab row has no Node access and reaches the main process only through its own bridge", async () => {
+  const { app, errors } = await launch();
+  try {
+    const row = await tabRowPage(app);
+    const page = await row.evaluate(() => ({
+      require: typeof (globalThis as unknown as { require?: unknown }).require,
+      process: typeof (globalThis as unknown as { process?: unknown }).process,
+      editorBridge: typeof (globalThis as unknown as { wysidown?: unknown }).wysidown,
+      bridge: Object.keys((globalThis as unknown as { wysidownTabs: object }).wysidownTabs).sort(),
+      csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content"),
+    }));
+    expect(page).toEqual({
+      require: "undefined",
+      process: "undefined",
+      editorBridge: "undefined",
+      bridge: ["close", "newTab", "onTabs", "select"],
+      csp: "default-src 'none'; script-src 'self'; style-src 'self'",
+    });
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("the tab row cannot navigate away or open a window", async () => {
+  const { app, errors } = await launch();
+  try {
+    const row = await tabRowPage(app);
+    const url = row.url();
+    await row.evaluate(() => {
+      globalThis.open("https://example.com/");
+      globalThis.location.href = "https://example.com/";
+    });
+    await row.waitForTimeout(500);
+    expect(row.url()).toBe(url);
+    expect(await windowCount(app)).toBe(1);
+    expect(app.windows()).toHaveLength(2);
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("the tab row's requests naming a tab the window does not have are ignored", async () => {
+  const { app, errors } = await launch();
+  try {
+    const row = await tabRowPage(app);
+    await row.evaluate(() => {
+      const bridge = (
+        globalThis as unknown as { wysidownTabs: { close(id: unknown): void; select(id: unknown): void } }
+      ).wysidownTabs;
+      for (const id of [0, 999, "1", null]) {
+        bridge.close(id);
+        bridge.select(id);
+      }
+    });
+    await row.waitForTimeout(500);
+    expect(await windowCount(app)).toBe(1);
+    expect(await tabs(app)).toEqual(["Untitled.md (active)"]);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);

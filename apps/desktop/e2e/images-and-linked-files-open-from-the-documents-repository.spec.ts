@@ -1,7 +1,8 @@
 import { test } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
+  documentPage,
   expect,
   fixture,
   launch,
@@ -9,6 +10,7 @@ import {
   newFolder,
   quit,
   readText,
+  tabs,
   title,
   userDataArgument,
   type Launched,
@@ -100,13 +102,14 @@ test("images beside the file and from the repository root load, and other files 
   }
 });
 
-test("Ctrl+click on a link to another markdown file opens it in the window", async () => {
+test("Ctrl+click on a link to another markdown file opens it in a new tab", async () => {
   const path = repository();
   const { app, window, errors } = await launch(offline(), path);
   try {
     await window.locator("a", { hasText: "installation guide" }).click({ modifiers: ["Control"] });
-    await expect(window.getByText("Run the installer.")).toBeVisible();
+    await expect((await documentPage(app, "Run the installer.")).getByText("Run the installer.")).toBeVisible();
     expect(await title(app)).toBe("install.md — Wysidown");
+    expect(await tabs(app)).toEqual([basename(path), "install.md (active)"]);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
@@ -121,7 +124,7 @@ test("links from the repository root and with escaped spaces open their files", 
     const { app, window, errors } = await launch(offline(), repository());
     try {
       await window.locator("a", { hasText: link }).click({ modifiers: ["Control"] });
-      await expect(window.getByText(text)).toBeVisible();
+      await expect((await documentPage(app, text)).getByText(text)).toBeVisible();
       expect(await title(app)).toBe(`${file} — Wysidown`);
       expect(errors).toEqual([]);
     } finally {

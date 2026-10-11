@@ -5,6 +5,15 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- The desktop app shows documents as tabs in one window. Open, a dropped file, a link to a
+  markdown file and double-clicking a `.md` file while the app is running each open the file in a
+  new tab, without asking to save the document already open; a file that is already open has its
+  tab shown instead, and a new untitled document with nothing typed in it is replaced. A tab shows
+  `●` while it has unsaved changes. Ctrl+N opens a new untitled tab, Ctrl+W closes the tab, and
+  Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PageDown and Ctrl+PageUp move between tabs. Clicking a tab shows
+  it, and its close button or a middle click closes it. Closing a tab with unsaved changes asks
+  first, closing the window asks about each such tab in turn, and Cancel keeps everything open.
+
 - The desktop app started without a file opens on an empty document named `Untitled.md`, with
   the caret already in it, so typing starts at once. The title bar, the "Save changes?" prompt
   and the Save As dialog all use that name. A second untitled window is `Untitled-2.md`, then

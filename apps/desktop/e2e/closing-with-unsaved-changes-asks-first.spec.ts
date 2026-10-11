@@ -1,7 +1,8 @@
-import { test, type ElectronApplication } from "@playwright/test";
+import { test } from "@playwright/test";
 import {
   answerMessageBoxes,
   clickAtEnd,
+  closeWindow,
   copyFixture,
   expect,
   fixture,
@@ -11,6 +12,7 @@ import {
   quit,
   title,
   type Launched,
+  windowCount,
 } from "./support.ts";
 
 const name = "27-blog-post.md";
@@ -28,19 +30,13 @@ async function edited(): Promise<Launched & { path: string }> {
   return { ...launched, path };
 }
 
-async function closeWindow(app: ElectronApplication): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]!.close();
-  });
-}
-
 test("Cancel keeps the window open and the file unchanged", async () => {
   const { app, errors, path } = await edited();
   try {
     await answerMessageBoxes(app, "Cancel");
     await closeWindow(app);
     await expect.poll(() => messageBoxes(app)).toEqual([`Save changes to ${name}?`]);
-    expect(app.windows()).toHaveLength(1);
+    expect(await windowCount(app)).toBe(1);
     expect(await title(app)).toBe(`● ${name} — Wysidown`);
     expect(readText(path)).toBe(blog);
     expect(errors).toEqual([]);

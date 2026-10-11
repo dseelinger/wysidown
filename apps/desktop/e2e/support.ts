@@ -13,38 +13,137 @@ export interface Launched {
 }
 
 /**
- * Starts the built app with `args` on its command line and waits for its window. The app keeps its
- * settings in a new temporary folder unless `args` names one with `--user-data-dir=`. The window
- * is moved to the middle of a display other than the primary one when there is one, as the VS Code
- * tests do; windows the app opens later are placed beside it.
+ * Starts the built app with `args` on its command line and waits for its document page. The app
+ * keeps its settings in a new temporary folder unless `args` names one with `--user-data-dir=`.
+ * The window is moved to the middle of a display other than the primary one when there is one, as
+ * the VS Code tests do; windows the app opens later are placed beside it. `errors` collects from
+ * every page the app opens, the tab row's included.
  */
 export async function launch(...args: string[]): Promise<Launched> {
   const userData = args.some((a) => a.startsWith("--user-data-dir=")) ? [] : [userDataArgument(newFolder())];
   const app = await electron.launch({
     args: [join(import.meta.dirname, "..", "dist", "main.cjs"), ...userData, ...args],
   });
-  const window = await app.firstWindow();
-  await app.evaluate(({ BrowserWindow, screen }) => {
+  const errors: string[] = [];
+  const watch = (page: Page): void => {
+    page.on("console", (m) => {
+      if (m.type() !== "error" && m.type() !== "warning") return;
+      if (missingImage(m.text(), m.location().url)) return;
+      errors.push(m.text());
+    });
+    page.on("pageerror", (e) => errors.push(e.message));
+  };
+  app.on("window", watch);
+  for (const page of app.windows()) watch(page);
+  const window = await documentPage(app);
+  await app.evaluate(({ BaseWindow, screen }) => {
     const primary = screen.getPrimaryDisplay();
     const other = screen.getAllDisplays().find((d) => d.id !== primary.id);
     if (!other) return;
     const area = other.workArea;
-    for (const w of BrowserWindow.getAllWindows()) {
+    for (const w of BaseWindow.getAllWindows()) {
       const { width, height } = w.getBounds();
       const x = area.x + Math.max(0, Math.round((area.width - width) / 2));
       const y = area.y + Math.max(0, Math.round((area.height - height) / 2));
       w.setBounds({ x, y, width: Math.min(width, area.width), height: Math.min(height, area.height) });
     }
   });
-  const errors: string[] = [];
-  window.on("console", (m) => {
-    if (m.type() !== "error" && m.type() !== "warning") return;
-    if (missingImage(m.text(), m.location().url)) return;
-    errors.push(m.text());
-  });
-  window.on("pageerror", (e) => errors.push(e.message));
   await window.waitForLoadState("domcontentloaded");
   return { app, window, errors };
+}
+
+/** True for a page showing a document, as against a tab row. */
+function isDocument(page: Page): boolean {
+  return page.url().endsWith("/renderer/index.html");
+}
+
+/**
+ * The page of the document that contains `text`, or of the first document when `text` is not
+ * given. Waits for it to appear.
+ */
+export async function documentPage(app: ElectronApplication, text?: string): Promise<Page> {
+  let found: Page | undefined;
+  await expect
+    .poll(async () => {
+      for (const page of app.windows().filter(isDocument)) {
+        if (text === undefined || (await page.getByText(text).count()) > 0) {
+          found = page;
+          return true;
+        }
+      }
+      return false;
+    })
+    .toBe(true);
+  return found!;
+}
+
+/** The pages of every open document. */
+export function documentPages(app: ElectronApplication): Page[] {
+  return app.windows().filter(isDocument);
+}
+
+/** The tab row page of the app's only window. */
+export async function tabRowPage(app: ElectronApplication): Promise<Page> {
+  await expect.poll(() => app.windows().some((p) => p.url().endsWith("/renderer/tab-row.html"))).toBe(true);
+  return app.windows().find((p) => p.url().endsWith("/renderer/tab-row.html"))!;
+}
+
+/** The tab row's tabs, in order: each name, after `● ` when it has unsaved changes and before ` (active)` for the shown one. */
+export async function tabs(app: ElectronApplication): Promise<string[]> {
+  const row = await tabRowPage(app);
+  return row.evaluate(() =>
+    [...document.querySelectorAll(".tab")].map(
+      (tab) =>
+        (tab.classList.contains("dirty") ? "● " : "") +
+        (tab.querySelector(".name")?.textContent ?? "") +
+        (tab.getAttribute("aria-selected") === "true" ? " (active)" : ""),
+    ),
+  );
+}
+
+/** Clicks the tab named `name` in the tab row. */
+export async function clickTab(app: ElectronApplication, name: string): Promise<void> {
+  const row = await tabRowPage(app);
+  await row
+    .locator(".tab")
+    .filter({ has: row.locator(".name").getByText(name, { exact: true }) })
+    .click();
+}
+
+/**
+ * Presses `key` with Ctrl, and Shift when `shift` is true, in `page`. The key goes through the
+ * main process's input handling as a typed key does, which Playwright's own key presses do not.
+ */
+export async function pressCtrl(app: ElectronApplication, page: Page, key: string, shift = false): Promise<void> {
+  await page.evaluate(() => {
+    Object.assign(globalThis, { pressCtrlTarget: true });
+  });
+  await app.evaluate(
+    async ({ webContents }, { keyCode, shift }) => {
+      let target: Electron.WebContents | undefined;
+      for (const contents of webContents.getAllWebContents()) {
+        if ((await contents.executeJavaScript("globalThis.pressCtrlTarget === true")) === true) target = contents;
+      }
+      if (!target) throw new Error("the page was not found");
+      await target.executeJavaScript("delete globalThis.pressCtrlTarget");
+      const modifiers: ("control" | "shift")[] = shift ? ["control", "shift"] : ["control"];
+      target.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+      target.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    },
+    { keyCode: key, shift },
+  );
+}
+
+/** The number of the app's windows. */
+export async function windowCount(app: ElectronApplication): Promise<number> {
+  return app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().length);
+}
+
+/** Closes the app's first window, as its close button does. */
+export async function closeWindow(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ BaseWindow }) => {
+    BaseWindow.getAllWindows()[0]!.close();
+  });
 }
 
 /**
@@ -105,9 +204,11 @@ export function readText(path: string): string {
 export async function menu(
   app: ElectronApplication,
   id:
+    | "new"
     | "open"
     | "save"
     | "save-as"
+    | "close-tab"
     | "find"
     | "replace"
     | "remote-images"
@@ -217,7 +318,7 @@ function fixturePath(name: string): string {
 
 /** The window's title bar text. */
 export async function title(app: ElectronApplication): Promise<string> {
-  return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getTitle());
+  return app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0]!.getTitle());
 }
 
 /** Closes the app, discarding unsaved changes. */

@@ -6,6 +6,7 @@ import {
   chooseToSaveAs,
   clickAtEnd,
   copyFixture,
+  documentPage,
   expect,
   fixture,
   launch,
@@ -15,6 +16,7 @@ import {
   readText,
   quit,
   save,
+  tabs,
   title,
 } from "./support.ts";
 
@@ -122,15 +124,17 @@ test("Save on an untitled document asks where to save it", async () => {
   }
 });
 
-test("Open replaces the document with the chosen file", async () => {
+test("Open from a document with a file opens the chosen file in a new tab after it", async () => {
   const path = copyFixture("20-headings.md");
   const { app, window, errors } = await launch(copyFixture(name));
   try {
     await expect(window.getByText(sentence)).toBeVisible();
     await chooseToOpen(app, path);
     await menu(app, "open");
-    await expect(window.getByText("Setext heading level one")).toBeVisible();
-    await expect(window.getByText(sentence)).toHaveCount(0);
+    await expect.poll(() => tabs(app)).toEqual([name, "20-headings.md (active)"]);
+    const opened = await documentPage(app, "Setext heading level one");
+    await expect(opened.getByText(sentence)).toHaveCount(0);
+    await expect(window.getByText(sentence)).toBeVisible();
     expect(await title(app)).toBe("20-headings.md — Wysidown");
     expect(errors).toEqual([]);
   } finally {
@@ -138,7 +142,22 @@ test("Open replaces the document with the chosen file", async () => {
   }
 });
 
-test("Open with unsaved changes asks first, and Cancel keeps the document", async () => {
+test("Open from an untitled document with no edits replaces it", async () => {
+  const { app, window, errors } = await launch();
+  try {
+    await expect(window.locator(".ProseMirror")).toBeVisible();
+    await chooseToOpen(app, copyFixture("20-headings.md"));
+    await menu(app, "open");
+    await expect(window.getByText("Setext heading level one")).toBeVisible();
+    expect(await tabs(app)).toEqual(["20-headings.md (active)"]);
+    expect(await title(app)).toBe("20-headings.md — Wysidown");
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("Open with unsaved changes asks nothing and keeps the changes in their own tab", async () => {
   const path = copyFixture(name);
   const { app, window, errors } = await launch(path);
   try {
@@ -148,9 +167,27 @@ test("Open with unsaved changes asks first, and Cancel keeps the document", asyn
     await answerMessageBoxes(app, "Cancel");
     await chooseToOpen(app, copyFixture("20-headings.md"));
     await menu(app, "open");
-    await expect.poll(() => messageBoxes(app)).toEqual([`Save changes to ${name}?`]);
+    await expect.poll(() => tabs(app)).toEqual([`● ${name}`, "20-headings.md (active)"]);
+    expect(await messageBoxes(app)).toEqual([]);
     await expect(window.getByText(`${lineEnd} Really.`)).toBeVisible();
-    expect(await title(app)).toBe(`● ${name} — Wysidown`);
+    expect(readText(path)).toBe(blog);
+    expect(errors).toEqual([]);
+  } finally {
+    await quit(app);
+  }
+});
+
+test("opening a file that is already open shows its tab instead of a second copy", async () => {
+  const path = copyFixture(name);
+  const { app, errors } = await launch(path);
+  try {
+    await chooseToOpen(app, copyFixture("20-headings.md"));
+    await menu(app, "open");
+    await expect.poll(() => tabs(app)).toEqual([name, "20-headings.md (active)"]);
+    await chooseToOpen(app, path.toUpperCase());
+    await menu(app, "open");
+    await expect.poll(() => tabs(app)).toEqual([`${name} (active)`, "20-headings.md"]);
+    expect(await title(app)).toBe(`${name} — Wysidown`);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);
@@ -169,6 +206,7 @@ test("a file that is not valid UTF-8 is refused and the document stays", async (
     await expect.poll(() => messageBoxes(app)).toEqual(["Wysidown cannot open latin1.md."]);
     await expect(window.getByText(sentence)).toBeVisible();
     expect(await title(app)).toBe(`${name} — Wysidown`);
+    expect(await tabs(app)).toEqual([`${name} (active)`]);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);

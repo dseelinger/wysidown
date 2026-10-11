@@ -1,0 +1,118 @@
+:root {
+  --row: #f3f3f3;
+  --tab: #ececec;
+  --active: #ffffff;
+  --text: #616161;
+  --active-text: #333333;
+  --border: #e5e5e5;
+  --hover: rgba(0, 0, 0, 0.1);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --row: #252526;
+    --tab: #2d2d2d;
+    --active: #1e1e1e;
+    --text: #969696;
+    --active-text: #ffffff;
+    --border: #252526;
+    --hover: rgba(255, 255, 255, 0.1);
+  }
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  background: var(--row);
+  font:
+    13px "Segoe UI",
+    system-ui,
+    sans-serif;
+  user-select: none;
+}
+
+#tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 0 4px 0 12px;
+  border-right: 1px solid var(--border);
+  background: var(--tab);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab[aria-selected="true"] {
+  background: var(--active);
+  color: var(--active-text);
+}
+
+.close,
+#new {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.close {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  visibility: hidden;
+}
+
+.close::before {
+  content: "×";
+  font-size: 16px;
+}
+
+.tab:hover .close,
+.tab[aria-selected="true"] .close,
+.tab.dirty .close {
+  visibility: visible;
+}
+
+.tab.dirty .close::before {
+  content: "●";
+  font-size: 12px;
+}
+
+.tab.dirty .close:hover::before {
+  content: "×";
+  font-size: 16px;
+}
+
+.close:hover,
+#new:hover {
+  background: var(--hover);
+}
+
+#new {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: 3px 4px;
+  color: var(--text);
+  font-size: 18px;
+}

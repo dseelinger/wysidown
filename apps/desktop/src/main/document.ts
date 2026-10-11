@@ -1,6 +1,6 @@
 import { applyEdits, type EditorMessage, type HostMessage, type Resources, type TextEdit } from "@wysidown/core";
 
-/** The document a window shows: its text, the file it came from, and whether it has unsaved changes. */
+/** The document a tab shows: its text, the file it came from, and whether it has unsaved changes. */
 export class HostDocument {
   readonly #send: (message: HostMessage) => void;
   readonly #onDirtyChange: () => void;
