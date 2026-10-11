@@ -21,13 +21,16 @@ import { pathToFileURL } from "node:url";
 import { HostDocument } from "./document.ts";
 import { savePastedImage } from "./images.ts";
 import { fileScheme, folderOf, linkedAddress, linkedFile, resourcesOf, serveImage, type Folder } from "./resources.ts";
-import type { TabRowItem } from "../renderer/tab-row-bridge.ts";
+import type { TabRowPane } from "../renderer/tab-row-bridge.ts";
 import type { Theme } from "../renderer/theme.ts";
 import { defaults, readSettings, writeSettings, type Settings } from "./settings.ts";
 
 const pageUrl = pathToFileURL(join(__dirname, "renderer", "index.html")).href;
 const tabRowUrl = pathToFileURL(join(__dirname, "renderer", "tab-row.html")).href;
 const tabRowHeight = 35;
+/** The width of the splitter between two panes; it matches `#splitter` in tab-row.css. */
+const splitterWidth = 4;
+const minPaneWidth = 200;
 const markdownExtensions = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn", "txt"];
 const markdownFilter = { name: "Markdown", extensions: markdownExtensions };
 
@@ -36,6 +39,8 @@ interface Tab {
   /** Issued by the main process; the tab row names tabs by it. */
   readonly id: number;
   readonly window: EditorWindow;
+  /** The pane the tab is in; it changes when the tab is moved to the other pane. */
+  pane: Pane;
   readonly view: WebContentsView;
   readonly doc: HostDocument;
   /** The open document's folder; null when it has no file. */
@@ -48,14 +53,29 @@ interface Tab {
   readonly untitled: number;
 }
 
-/** A window: the tab row across its top, and its tabs, of which only the active one is shown. */
+/** One side of a window: its tabs, of which only the active one is shown. */
+interface Pane {
+  /** In the order its tab row shows them. */
+  readonly tabs: Tab[];
+  /** Null only while the pane is being created. */
+  active: Tab | null;
+}
+
+/**
+ * A window: one pane, or a left and a right pane, and the page behind them that draws their tab
+ * rows and the splitter between them.
+ */
 interface EditorWindow {
   readonly win: BaseWindow;
   readonly tabRow: WebContentsView;
-  /** In the order the tab row shows them. */
-  readonly tabs: Tab[];
-  /** Null only while the window is being created. */
-  active: Tab | null;
+  /** Left to right; one or two. */
+  readonly panes: Pane[];
+  /** The pane that menu actions and the tab keys act on. */
+  focused: Pane;
+  /** The left pane's share of the width the two panes divide. */
+  split: number;
+  /** True while the splitter is dragged and the tab row page lies above the documents. */
+  dragging: boolean;
   /** True once the user has agreed to close the window. */
   closing: boolean;
 }
@@ -70,8 +90,18 @@ let settings: Settings = { ...defaults };
 
 const settingsPath = (): string => join(app.getPath("userData"), "settings.json");
 
+/** The window's tabs, the left pane's first. */
+function tabsOf(window: EditorWindow): Tab[] {
+  return window.panes.flatMap((p) => p.tabs);
+}
+
 function allTabs(): Tab[] {
-  return [...windows].flatMap((w) => w.tabs);
+  return [...windows].flatMap(tabsOf);
+}
+
+/** True while the tab is open in its window. */
+function isOpen(tab: Tab): boolean {
+  return tab.window.panes.includes(tab.pane) && tab.pane.tabs.includes(tab);
 }
 
 /** Reads a file as UTF-8, keeping any byte order mark. Throws when the bytes are not valid UTF-8. */
@@ -105,18 +135,33 @@ function samePath(a: string, b: string): boolean {
   return key(a) === key(b);
 }
 
-/** Shows the active tab's name in the title bar, and every tab in the tab row. */
+/** The x and width of each pane, left to right, keeping each at least `minPaneWidth` wide when the window allows it. */
+function paneBounds(window: EditorWindow): { x: number; width: number }[] {
+  const { width } = window.win.getContentBounds();
+  if (window.panes.length < 2) return [{ x: 0, width }];
+  const room = Math.max(0, width - splitterWidth);
+  const wanted = Math.round(room * window.split);
+  const left =
+    room < 2 * minPaneWidth ? Math.round(room / 2) : Math.min(Math.max(wanted, minPaneWidth), room - minPaneWidth);
+  return [
+    { x: 0, width: left },
+    { x: left + splitterWidth, width: room - left },
+  ];
+}
+
+/** Shows the focused pane's active tab's name in the title bar, and every pane's tabs in the tab row. */
 function showTabs(window: EditorWindow): void {
-  const { win, tabRow, tabs, active } = window;
+  const { win, tabRow, panes, focused } = window;
   if (win.isDestroyed()) return;
+  const active = focused.active;
   if (active) win.setTitle(`${active.doc.dirty ? "● " : ""}${documentName(active)} — Wysidown`);
-  const items: TabRowItem[] = tabs.map((t) => ({
-    id: t.id,
-    name: documentName(t),
-    dirty: t.doc.dirty,
-    active: t === active,
+  const bounds = paneBounds(window);
+  const state: TabRowPane[] = panes.map((pane, index) => ({
+    ...bounds[index]!,
+    focused: pane === focused,
+    tabs: pane.tabs.map((t) => ({ id: t.id, name: documentName(t), dirty: t.doc.dirty, active: t === pane.active })),
   }));
-  if (!tabRow.webContents.isDestroyed()) tabRow.webContents.send("tabs", items);
+  if (!tabRow.webContents.isDestroyed()) tabRow.webContents.send("tabs", state);
 }
 
 async function showError(window: EditorWindow, message: string, detail: string): Promise<void> {
@@ -142,12 +187,13 @@ async function load(tab: Tab, path: string, text: string): Promise<void> {
 }
 
 /**
- * Opens `path` in the window. A file already open there has its tab shown. Otherwise the file
- * replaces the active tab when that is an untitled document with no edits, and opens in a new tab
- * after the active one when it is not. A file that cannot be read opens nothing.
+ * Opens `path` in the window's focused pane. A file already open in either pane has its tab shown
+ * and its pane focused. Otherwise the file replaces the focused pane's active tab when that is an
+ * untitled document with no edits, and opens in a new tab after it when it is not. A file that
+ * cannot be read opens nothing.
  */
 async function openPath(window: EditorWindow, path: string): Promise<void> {
-  const openTab = () => window.tabs.find((t) => t.doc.path !== null && samePath(t.doc.path, path));
+  const openTab = () => tabsOf(window).find((t) => t.doc.path !== null && samePath(t.doc.path, path));
   const already = openTab();
   if (already) {
     activate(already);
@@ -160,10 +206,10 @@ async function openPath(window: EditorWindow, path: string): Promise<void> {
     activate(opened);
     return;
   }
-  let tab = window.active;
+  let tab = window.focused.active;
   if (tab) await tab.doc.flush();
-  if (!tab || tab.closing || tab.doc.path !== null || tab.doc.dirty || !window.tabs.includes(tab)) {
-    tab = addTab(window);
+  if (!tab || tab.closing || tab.doc.path !== null || tab.doc.dirty || !isOpen(tab) || tab.pane !== window.focused) {
+    tab = addTab(window.focused);
   }
   await load(tab, path, text);
   activate(tab);
@@ -211,7 +257,7 @@ async function save(tab: Tab): Promise<boolean> {
 async function confirmDiscard(tab: Tab): Promise<boolean> {
   const { doc, window } = tab;
   await doc.flush();
-  if (window.win.isDestroyed() || !window.tabs.includes(tab) || !doc.dirty) return true;
+  if (window.win.isDestroyed() || !isOpen(tab) || !doc.dirty) return true;
   activate(tab);
   const { response } = await dialog.showMessageBox(window.win, {
     type: "warning",
@@ -309,32 +355,76 @@ function showSourceMode(tab: Tab): void {
   if (item) item.checked = tab.sourceMode;
 }
 
-/** Places the tab row across the top of the window and the tabs' views below it. */
+/** Spreads the tab row page over the window and places each pane's views below its tab row. */
 function layout(window: EditorWindow): void {
   if (window.win.isDestroyed()) return;
   const { width, height } = window.win.getContentBounds();
-  window.tabRow.setBounds({ x: 0, y: 0, width, height: tabRowHeight });
-  const below = { x: 0, y: tabRowHeight, width, height: Math.max(0, height - tabRowHeight) };
-  for (const tab of window.tabs) tab.view.setBounds(below);
+  window.tabRow.setBounds({ x: 0, y: 0, width, height });
+  const bounds = paneBounds(window);
+  window.panes.forEach((pane, index) => {
+    const { x, width: paneWidth } = bounds[index]!;
+    const below = { x, y: tabRowHeight, width: paneWidth, height: Math.max(0, height - tabRowHeight) };
+    for (const tab of pane.tabs) tab.view.setBounds(below);
+  });
+  showTabs(window);
 }
 
-/** Shows the tab in its window, hides the others, and moves the keyboard focus into it. */
+/** Makes `pane` the window's focused pane, and shows its active tab in the title bar and the menu. */
+function focusPane(window: EditorWindow, pane: Pane): void {
+  if (window.focused === pane) return;
+  window.focused = pane;
+  showTabs(window);
+  if (window === lastFocused && pane.active) showSourceMode(pane.active);
+}
+
+/** Shows the tab in its pane, hides the pane's others, focuses the pane, and moves the keyboard focus into the tab. */
 function activate(tab: Tab): void {
-  const { window } = tab;
-  if (window.win.isDestroyed() || !window.tabs.includes(tab)) return;
-  window.active = tab;
-  for (const each of window.tabs) each.view.setVisible(each === tab);
+  const { window, pane } = tab;
+  if (window.win.isDestroyed() || !isOpen(tab)) return;
+  pane.active = tab;
+  window.focused = pane;
+  for (const each of pane.tabs) each.view.setVisible(each === tab);
   showTabs(window);
   if (window === lastFocused) showSourceMode(tab);
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.focus();
 }
 
-/** Shows the tab `step` places after the active one, wrapping around at either end. */
-function cycle(window: EditorWindow, step: number): void {
-  const { tabs, active } = window;
+/** Shows the tab `step` places after the pane's active one, wrapping around at either end. */
+function cycle(pane: Pane, step: number): void {
+  const { tabs, active } = pane;
   if (!active || tabs.length < 2) return;
   const at = (tabs.indexOf(active) + step + tabs.length) % tabs.length;
   activate(tabs[at]!);
+}
+
+/**
+ * Moves the pane's active tab, with its page and any unsaved changes, to the end of the other
+ * pane, creating the right pane when there is one pane. A pane the move leaves empty is removed,
+ * except the only pane, which gets a new untitled tab.
+ */
+function moveToOtherPane(from: Pane): void {
+  const tab = from.active;
+  const { window } = tab ?? {};
+  if (!tab || !window || window.win.isDestroyed() || !isOpen(tab)) return;
+  const splitting = window.panes.length === 1;
+  let to = window.panes.find((p) => p !== from);
+  if (!to) {
+    to = { tabs: [], active: null };
+    window.panes.push(to);
+  }
+  const at = from.tabs.indexOf(tab);
+  from.tabs.splice(at, 1);
+  to.tabs.push(tab);
+  tab.pane = to;
+  if (from.tabs.length === 0 && !splitting) {
+    window.panes.splice(window.panes.indexOf(from), 1);
+  } else {
+    from.active = from.tabs[Math.min(at, from.tabs.length - 1)] ?? addTab(from);
+    from.active.view.setVisible(true);
+  }
+  for (const each of to.tabs) each.view.setVisible(each === tab);
+  layout(window);
+  activate(tab);
 }
 
 /**
@@ -369,23 +459,36 @@ function tabRowSessionOnce(): Session {
   return own;
 }
 
-/** Handles the tab keys, as VS Code has them, pressed in any page of the window. */
-function onTabKey(window: EditorWindow, event: Event, input: Input): void {
-  if (input.type !== "keyDown" || !input.control || input.alt || input.meta) return;
+/** Handles the tab and pane keys, as VS Code has them, pressed in a page of the window; they act on the pane `paneOf` returns. */
+function onTabKey(paneOf: () => Pane, event: Event, input: Input): void {
+  if (input.type !== "keyDown" || !input.control || input.meta) return;
+  const pane = paneOf();
   const key = input.key.toLowerCase();
-  if (key === "tab") cycle(window, input.shift ? -1 : 1);
+  if (input.alt) {
+    if (input.shift || (key !== "arrowleft" && key !== "arrowright")) return;
+    moveToOtherPane(pane);
+  } else if (key === "tab") cycle(pane, input.shift ? -1 : 1);
   else if (input.shift) return;
-  else if (key === "pagedown") cycle(window, 1);
-  else if (key === "pageup") cycle(window, -1);
-  else if (key === "n") activate(addTab(window));
+  else if (key === "pagedown") cycle(pane, 1);
+  else if (key === "pageup") cycle(pane, -1);
+  else if (key === "n") activate(addTab(pane));
   else if (key === "w") {
-    if (window.active) void closeTab(window.active);
-  } else return;
+    if (pane.active) void closeTab(pane.active);
+  } else if (key === "\\" || input.code === "Backslash") moveToOtherPane(pane);
+  else return;
   event.preventDefault();
 }
 
-/** Adds an untitled tab after the active one, hidden until it is activated. */
-function addTab(window: EditorWindow): Tab {
+/** The window that holds `pane`; null once the pane has been removed. */
+function windowOfPane(pane: Pane): EditorWindow | null {
+  for (const window of windows) if (window.panes.includes(pane)) return window;
+  return null;
+}
+
+/** Adds an untitled tab to the pane after its active one, hidden until it is activated. */
+function addTab(pane: Pane): Tab {
+  const window = windowOfPane(pane);
+  if (!window) throw new Error("the pane is not in a window");
   const view = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
@@ -407,6 +510,7 @@ function addTab(window: EditorWindow): Tab {
   const tab: Tab = {
     id: ++lastTabId,
     window,
+    pane,
     view,
     doc,
     folder: null,
@@ -415,34 +519,55 @@ function addTab(window: EditorWindow): Tab {
     untitled: freeUntitledNumber(),
   };
   doc.setResources(resourcesOf(null, settings.remoteImages));
-  const at = window.active ? window.tabs.indexOf(window.active) + 1 : window.tabs.length;
-  window.tabs.splice(at, 0, tab);
+  const active = pane.active ? pane.tabs.indexOf(pane.active) : -1;
+  pane.tabs.splice(active < 0 ? pane.tabs.length : active + 1, 0, tab);
   view.setVisible(false);
   window.win.contentView.addChildView(view);
   layout(window);
   contents.on("before-input-event", (event, input) => {
-    onTabKey(window, event, input);
+    onTabKey(() => tab.pane, event, input);
+  });
+  // Clicking in a page focuses its pane. Loading the page also moves the keyboard focus into it,
+  // so that focus is ignored and handed back to the focused pane's tab.
+  let navigated = false;
+  contents.on("focus", () => {
+    if (navigated && isOpen(tab) && tab.pane.active === tab && contents.isFocused()) focusPane(window, tab.pane);
+  });
+  contents.once("did-navigate", () => {
+    navigated = true;
+    const active = window.focused.active;
+    if (active && active !== tab && !active.view.webContents.isDestroyed()) active.view.webContents.focus();
   });
   void contents.loadURL(pageUrl);
   showTabs(window);
   return tab;
 }
 
-/** Removes the tab and its page. Closing the last tab closes the window. */
+/**
+ * Removes the tab and its page. Closing the last tab in a pane removes the pane, and the other
+ * pane takes the whole window; closing the last tab in the window closes it.
+ */
 function removeTab(tab: Tab): void {
-  const { window } = tab;
-  const at = window.tabs.indexOf(tab);
-  if (at < 0) return;
-  window.tabs.splice(at, 1);
+  const { window, pane } = tab;
+  if (!isOpen(tab)) return;
+  const at = pane.tabs.indexOf(tab);
+  pane.tabs.splice(at, 1);
   if (!window.win.isDestroyed()) window.win.contentView.removeChildView(tab.view);
   if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
-  if (window.tabs.length === 0) {
+  if (pane.tabs.length > 0) {
+    if (pane.active === tab) activate(pane.tabs[Math.min(at, pane.tabs.length - 1)]!);
+    else showTabs(window);
+    return;
+  }
+  window.panes.splice(window.panes.indexOf(pane), 1);
+  const other = window.panes[0];
+  if (!other?.active) {
     window.closing = true;
     window.win.close();
     return;
   }
-  if (window.active === tab) activate(window.tabs[Math.min(at, window.tabs.length - 1)]!);
-  else showTabs(window);
+  layout(window);
+  activate(other.active);
 }
 
 /** Closes the tab, asking first when it has unsaved changes. */
@@ -455,15 +580,15 @@ async function closeTab(tab: Tab): Promise<void> {
 
 /** Closes the window once every tab with unsaved changes has been saved or discarded; Cancel on any keeps them all. */
 async function closeWindow(window: EditorWindow): Promise<void> {
-  for (const tab of [...window.tabs]) if (!(await confirmDiscard(tab))) return;
+  for (const tab of tabsOf(window)) if (!(await confirmDiscard(tab))) return;
   window.closing = true;
   if (!window.win.isDestroyed()) window.win.close();
 }
 
-/** The tab a menu click acts on: the active tab of the window clicked, else of the window focused last. */
+/** The tab a menu click acts on: the focused pane's active tab in the window clicked, else in the window focused last. */
 function tabFor(win: BaseWindow | undefined): Tab | null {
-  for (const window of windows) if (window.win === win) return window.active;
-  return lastFocused?.active ?? null;
+  for (const window of windows) if (window.win === win) return window.focused.active;
+  return lastFocused?.focused.active ?? null;
 }
 
 /** A menu click handler that calls `action` with the tab the click acts on and the item's checked state. */
@@ -486,7 +611,7 @@ function buildMenu(): Menu {
           accelerator: "CmdOrCtrl+N",
           registerAccelerator: false,
           click: onTab((tab) => {
-            activate(addTab(tab.window));
+            activate(addTab(tab.pane));
           }),
         },
         { id: "open", label: "&Open…", accelerator: "CmdOrCtrl+O", click: onTab(openWithDialog) },
@@ -550,6 +675,26 @@ function buildMenu(): Menu {
           click: onTab(setSourceMode),
         },
         { type: "separator" },
+        // The pane keys are handled before the page sees them; the items act when clicked.
+        {
+          id: "split-right",
+          label: "Split &Right",
+          accelerator: "CmdOrCtrl+\\",
+          registerAccelerator: false,
+          click: onTab((tab) => {
+            moveToOtherPane(tab.pane);
+          }),
+        },
+        {
+          id: "move-to-other-pane",
+          label: "&Move Tab to Other Pane",
+          accelerator: "CmdOrCtrl+Alt+Right",
+          registerAccelerator: false,
+          click: onTab((tab) => {
+            moveToOtherPane(tab.pane);
+          }),
+        },
+        { type: "separator" },
         {
           id: "remote-images",
           label: "Load &Images from the Web",
@@ -579,6 +724,30 @@ function buildMenu(): Menu {
       ],
     },
   ]);
+}
+
+/** Raises the tab row page above the documents, so it keeps the pointer while the splitter is dragged. */
+function startDrag(window: EditorWindow): void {
+  if (window.panes.length < 2 || window.win.isDestroyed()) return;
+  window.dragging = true;
+  window.win.contentView.addChildView(window.tabRow);
+}
+
+/** Moves the splitter so its middle is at `x`, keeping each pane at least `minPaneWidth` wide. */
+function dragTo(window: EditorWindow, x: number): void {
+  if (!window.dragging || !Number.isFinite(x) || window.win.isDestroyed()) return;
+  const room = window.win.getContentBounds().width - splitterWidth;
+  if (room < 2 * minPaneWidth) return;
+  const left = Math.min(Math.max(Math.round(x - splitterWidth / 2), minPaneWidth), room - minPaneWidth);
+  window.split = left / room;
+  layout(window);
+}
+
+/** Lowers the tab row page behind the documents again. */
+function endDrag(window: EditorWindow): void {
+  if (!window.dragging) return;
+  window.dragging = false;
+  if (!window.win.isDestroyed()) window.win.contentView.addChildView(window.tabRow, 0);
 }
 
 /** The tab whose page sent an IPC message; null when it came from anywhere else. */
@@ -618,23 +787,35 @@ function createWindow(path?: string): void {
       session: tabRowSessionOnce(),
     },
   });
-  const window: EditorWindow = { win, tabRow, tabs: [], active: null, closing: false };
+  const pane: Pane = { tabs: [], active: null };
+  const window: EditorWindow = {
+    win,
+    tabRow,
+    panes: [pane],
+    focused: pane,
+    split: 0.5,
+    dragging: false,
+    closing: false,
+  };
   windows.add(window);
   lastFocused = window;
+  // Transparent, so the documents still show while the page is raised above them for a drag.
+  tabRow.setBackgroundColor("#00000000");
   win.contentView.addChildView(tabRow);
   tabRow.webContents.on("did-finish-load", () => {
     showTabs(window);
   });
   tabRow.webContents.on("before-input-event", (event, input) => {
-    onTabKey(window, event, input);
+    onTabKey(() => window.focused, event, input);
   });
   void tabRow.webContents.loadURL(tabRowUrl);
-  const tab = addTab(window);
+  const tab = addTab(pane);
   activate(tab);
   tab.view.webContents.once("did-finish-load", () => {
     if (win.isDestroyed()) return;
     win.show();
-    if (window.active && !window.active.view.webContents.isDestroyed()) window.active.view.webContents.focus();
+    const active = window.focused.active;
+    if (active && !active.view.webContents.isDestroyed()) active.view.webContents.focus();
   });
   const relayout = (): void => {
     layout(window);
@@ -645,7 +826,10 @@ function createWindow(path?: string): void {
   win.on("restore", relayout);
   win.on("focus", () => {
     lastFocused = window;
-    if (window.active) showSourceMode(window.active);
+    if (window.focused.active) showSourceMode(window.focused.active);
+  });
+  win.on("blur", () => {
+    endDrag(window);
   });
   win.on("close", (event) => {
     if (window.closing) return;
@@ -654,7 +838,7 @@ function createWindow(path?: string): void {
   });
   win.on("closed", () => {
     windows.delete(window);
-    for (const each of [tabRow, ...window.tabs.map((t) => t.view)]) {
+    for (const each of [tabRow, ...tabsOf(window).map((t) => t.view)]) {
       if (!each.webContents.isDestroyed()) each.webContents.close();
     }
     if (lastFocused === window) lastFocused = [...windows].at(-1) ?? null;
@@ -694,18 +878,29 @@ ipcMain.on("open-file", (event, path: unknown) => {
   if (tab) void openDropped(tab, path);
 });
 
-// The tab row names a tab by the id the main process gave it; ids from any other window are ignored.
-ipcMain.on("tab-row", (event, action: unknown, id: unknown) => {
+// The tab row names a tab by the id the main process gave it, and a pane by its place from the
+// left; ids from any other window, and panes the window does not have, are ignored.
+ipcMain.on("tab-row", (event, action: unknown, arg: unknown) => {
   const window = windowOfTabRow(event.sender, event.senderFrame?.url);
   if (!window) return;
-  if (action === "new") {
-    activate(addTab(window));
-    return;
+  if (action === "drag-start") startDrag(window);
+  else if (action === "drag") {
+    if (typeof arg === "number") dragTo(window, arg);
+  } else if (action === "drag-end") endDrag(window);
+  else if (action === "equal") {
+    window.split = 0.5;
+    layout(window);
+  } else if (action === "new" || action === "focus") {
+    const pane = typeof arg === "number" && Number.isInteger(arg) ? window.panes[arg] : undefined;
+    if (!pane) return;
+    if (action === "new") activate(addTab(pane));
+    else if (pane.active) activate(pane.active);
+  } else {
+    const tab = tabsOf(window).find((t) => t.id === arg);
+    if (!tab) return;
+    if (action === "select") activate(tab);
+    else if (action === "close") void closeTab(tab);
   }
-  const tab = window.tabs.find((t) => t.id === id);
-  if (!tab) return;
-  if (action === "select") activate(tab);
-  else if (action === "close") void closeTab(tab);
 });
 
 // One process per user data folder: a second launch hands its command line to the first and exits.
@@ -724,7 +919,7 @@ if (!app.requestSingleInstanceLock()) {
       }
       if (window.win.isMinimized()) window.win.restore();
       window.win.focus();
-      if (path === undefined) activate(addTab(window));
+      if (path === undefined) activate(addTab(window.focused));
       else void openPath(window, path);
     });
   });

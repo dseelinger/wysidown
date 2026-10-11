@@ -3,6 +3,7 @@ import {
   answerMessageBoxes,
   chooseToSaveAs,
   closeWindow,
+  documentBounds,
   expect,
   launch,
   menu,
@@ -11,6 +12,7 @@ import {
   quit,
   readText,
   saveDialogDefaults,
+  tabRowIsBehind,
   tabRowPage,
   tabs,
   title,
@@ -114,7 +116,7 @@ test("the tab row has no Node access and reaches the main process only through i
       require: "undefined",
       process: "undefined",
       editorBridge: "undefined",
-      bridge: ["close", "newTab", "onTabs", "select"],
+      bridge: ["close", "drag", "dragEnd", "dragStart", "equalPanes", "focusPane", "newTab", "onTabs", "select"],
       csp: "default-src 'none'; script-src 'self'; style-src 'self'",
     });
     expect(errors).toEqual([]);
@@ -142,22 +144,39 @@ test("the tab row cannot navigate away or open a window", async () => {
   }
 });
 
-test("the tab row's requests naming a tab the window does not have are ignored", async () => {
+test("the tab row's requests naming a tab or pane the window does not have are ignored", async () => {
   const { app, errors } = await launch();
   try {
     const row = await tabRowPage(app);
     await row.evaluate(() => {
       const bridge = (
-        globalThis as unknown as { wysidownTabs: { close(id: unknown): void; select(id: unknown): void } }
+        globalThis as unknown as {
+          wysidownTabs: {
+            close(id: unknown): void;
+            select(id: unknown): void;
+            newTab(pane: unknown): void;
+            focusPane(pane: unknown): void;
+            dragStart(): void;
+            drag(x: unknown): void;
+          };
+        }
       ).wysidownTabs;
       for (const id of [0, 999, "1", null]) {
         bridge.close(id);
         bridge.select(id);
       }
+      for (const pane of [1, -1, 0.5, "0", null]) {
+        bridge.newTab(pane);
+        bridge.focusPane(pane);
+      }
+      bridge.dragStart();
+      for (const x of [Number.NaN, Infinity, "300", null]) bridge.drag(x);
     });
     await row.waitForTimeout(500);
     expect(await windowCount(app)).toBe(1);
     expect(await tabs(app)).toEqual(["Untitled.md (active)"]);
+    expect(await tabRowIsBehind(app)).toBe(true);
+    expect((await documentBounds(app)).views).toHaveLength(1);
     expect(errors).toEqual([]);
   } finally {
     await quit(app);

@@ -88,17 +88,52 @@ export async function tabRowPage(app: ElectronApplication): Promise<Page> {
   return app.windows().find((p) => p.url().endsWith("/renderer/tab-row.html"))!;
 }
 
-/** The tab row's tabs, in order: each name, after `● ` when it has unsaved changes and before ` (active)` for the shown one. */
+/** The tab row's tabs, in order, across every pane: as `panes` gives them. */
 export async function tabs(app: ElectronApplication): Promise<string[]> {
+  return (await panes(app)).flat();
+}
+
+/**
+ * Each pane's tabs, left to right and in order: each name, after `● ` when it has unsaved changes
+ * and before ` (active)` for the one its pane shows. The focused pane's list ends with `(focused)`
+ * when there are two panes.
+ */
+export async function panes(app: ElectronApplication): Promise<string[][]> {
   const row = await tabRowPage(app);
-  return row.evaluate(() =>
-    [...document.querySelectorAll(".tab")].map(
-      (tab) =>
-        (tab.classList.contains("dirty") ? "● " : "") +
-        (tab.querySelector(".name")?.textContent ?? "") +
-        (tab.getAttribute("aria-selected") === "true" ? " (active)" : ""),
-    ),
-  );
+  return row.evaluate(() => {
+    const all = [...document.querySelectorAll(".pane")];
+    return all.map((pane) => [
+      ...[...pane.querySelectorAll(".tab")].map(
+        (tab) =>
+          (tab.classList.contains("dirty") ? "● " : "") +
+          (tab.querySelector(".name")?.textContent ?? "") +
+          (tab.getAttribute("aria-selected") === "true" ? " (active)" : ""),
+      ),
+      ...(all.length > 1 && pane.classList.contains("focused") ? ["(focused)"] : []),
+    ]);
+  });
+}
+
+/** The x and width of every shown document view, left to right, and the window's content width. */
+export async function documentBounds(app: ElectronApplication): Promise<{ views: [number, number][]; width: number }> {
+  return app.evaluate(({ BaseWindow, WebContentsView }) => {
+    const win = BaseWindow.getAllWindows()[0]!;
+    const views = win.contentView.children
+      .filter((v): v is Electron.WebContentsView => v instanceof WebContentsView)
+      .filter((v) => v.getVisible() && v.webContents.getURL().endsWith("/renderer/index.html"))
+      .map((v) => v.getBounds())
+      .sort((a, b) => a.x - b.x)
+      .map((b): [number, number] => [b.x, b.width]);
+    return { views, width: win.getContentBounds().width };
+  });
+}
+
+/** True when the tab row page is the window's bottom view, behind every document. */
+export async function tabRowIsBehind(app: ElectronApplication): Promise<boolean> {
+  return app.evaluate(({ BaseWindow, WebContentsView }) => {
+    const first = BaseWindow.getAllWindows()[0]!.contentView.children[0];
+    return first instanceof WebContentsView && first.webContents.getURL().endsWith("/renderer/tab-row.html");
+  });
 }
 
 /** Clicks the tab named `name` in the tab row. */
@@ -115,22 +150,35 @@ export async function clickTab(app: ElectronApplication, name: string): Promise<
  * main process's input handling as a typed key does, which Playwright's own key presses do not.
  */
 export async function pressCtrl(app: ElectronApplication, page: Page, key: string, shift = false): Promise<void> {
+  await press(app, page, key, shift ? ["control", "shift"] : ["control"]);
+}
+
+/** Presses `key` with Ctrl and Alt in `page`, through the main process's input handling as `pressCtrl` does. */
+export async function pressCtrlAlt(app: ElectronApplication, page: Page, key: string): Promise<void> {
+  await press(app, page, key, ["control", "alt"]);
+}
+
+async function press(
+  app: ElectronApplication,
+  page: Page,
+  key: string,
+  modifiers: ("control" | "shift" | "alt")[],
+): Promise<void> {
   await page.evaluate(() => {
     Object.assign(globalThis, { pressCtrlTarget: true });
   });
   await app.evaluate(
-    async ({ webContents }, { keyCode, shift }) => {
+    async ({ webContents }, { keyCode, modifiers }) => {
       let target: Electron.WebContents | undefined;
       for (const contents of webContents.getAllWebContents()) {
         if ((await contents.executeJavaScript("globalThis.pressCtrlTarget === true")) === true) target = contents;
       }
       if (!target) throw new Error("the page was not found");
       await target.executeJavaScript("delete globalThis.pressCtrlTarget");
-      const modifiers: ("control" | "shift")[] = shift ? ["control", "shift"] : ["control"];
       target.sendInputEvent({ type: "keyDown", keyCode, modifiers });
       target.sendInputEvent({ type: "keyUp", keyCode, modifiers });
     },
-    { keyCode: key, shift },
+    { keyCode: key, modifiers },
   );
 }
 
@@ -213,6 +261,8 @@ export async function menu(
     | "replace"
     | "remote-images"
     | "source-mode"
+    | "split-right"
+    | "move-to-other-pane"
     | "theme-vscode"
     | "theme-github",
 ): Promise<void> {

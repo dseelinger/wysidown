@@ -5,6 +5,15 @@ Newest first. Each heading is `## <version> — <title>`; each fix commit adds o
 
 ## Unreleased
 
+- A desktop window can show two documents side by side. View > Split Right (Ctrl+\) moves the
+  current tab into a new right pane, and with two panes it moves the tab to the other pane; View >
+  Move Tab to Other Pane (Ctrl+Alt+Right or Ctrl+Alt+Left) does the same. Each pane has its own
+  tabs. Clicking in a pane makes it the one that Ctrl+W, Ctrl+N, Ctrl+Tab, Open, Save and the
+  title bar follow. A file is open in only one tab per window: opening it again shows that tab.
+  Drag the bar between the panes to resize them, down to 200 pixels each, and double-click it to
+  make them equal. A tab keeps its unsaved changes when it moves, and closing the last tab in a
+  pane gives the other pane the whole window.
+
 - The desktop app shows documents as tabs in one window. Open, a dropped file, a link to a
   markdown file and double-clicking a `.md` file while the app is running each open the file in a
   new tab, without asking to save the document already open; a file that is already open has its

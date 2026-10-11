@@ -94,7 +94,7 @@ test("Ctrl+N opens an untitled tab after the active one, and the tab row's + doe
     await pressCtrl(app, blogPage, "N");
     await expect.poll(() => tabs(app)).toEqual([blogName, "Untitled.md (active)", listsName]);
     expect(await title(app)).toBe("Untitled.md — Wysidown");
-    await (await tabRowPage(app)).locator("#new").click();
+    await (await tabRowPage(app)).locator(".new").click();
     await expect.poll(() => tabs(app)).toEqual([blogName, "Untitled.md", "Untitled-2.md (active)", listsName]);
     expect(errors).toEqual([]);
   } finally {
